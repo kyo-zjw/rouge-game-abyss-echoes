@@ -44,6 +44,27 @@ function lastPlayedText(ms) {
   return days + ' 天前';
 }
 
+/* 技能数值字段 -> 展示标签 / 格式化, 用于三选一悬停对比 */
+const SKILL_FIELDS = {
+  dmg: ['伤害', v => Math.round(v)],
+  cd: ['冷却', v => (Math.round(v * 100) / 100) + 's'],
+  range: ['射程', v => Math.round(v)],
+  radius: ['半径', v => Math.round(v)],
+  aoe: ['爆炸半径', v => Math.round(v)],
+  castRange: ['施法距离', v => Math.round(v)],
+  count: ['弹数', v => v],
+  chains: ['连锁', v => v],
+  shield: ['护盾', v => Math.round(v)],
+  duration: ['持续', v => v.toFixed(1) + 's'],
+  slow: ['减速', v => Math.round(v * 100) + '%'],
+  dmgMul: ['增伤', v => '+' + Math.round(v * 100) + '%'],
+  healPct: ['回复', v => Math.round(v * 100) + '%'],
+  knock: ['击退', v => Math.round(v)],
+  vuln: ['易伤', v => Math.round(v * 100) + '%'],
+  distance: ['距离', v => Math.round(v)],
+  speed: ['弹速', v => Math.round(v)]
+};
+
 const UI = {
   /* ---------------- 基础元件 ---------------- */
   bar(ctx, x, y, w, h, pct, fg, bg, radius, glow) {
@@ -573,14 +594,15 @@ const UI = {
 
     // 冲刺残影: 直接复制人物 PNG, 比圆点更像高速移动
     if (dash && entry && entry.ready) {
+      const art = this.playerArt(p, skinKey);
       for (let i = 1; i <= 3; i++) {
         const t = p.trail[Math.max(0, p.trail.length - 1 - i * 3)];
         if (!t) continue;
         ctx.save();
         ctx.globalAlpha = 0.12 * (4 - i);
         ctx.translate(t.x, t.y + pose.bob * 0.5);
-        ctx.scale(face, 1);
-        Assets.draw(ctx, 'player', skinKey, 0, 0, psize, psize, { time: p.walk, alpha: 1 });
+        ctx.scale(art.flip, 1);
+        Assets.draw(ctx, 'player', art.key, 0, 0, psize, psize, { frame: art.frame, time: p.walk, alpha: 1 });
         ctx.restore();
       }
       ctx.globalAlpha = 1;
@@ -691,11 +713,53 @@ const UI = {
     }
   },
 
+  /* ---------------- 朝向图集 ----------------
+     4 帧模式(当前): 0 东南 / 1 南 / 2 西南 / 3 北
+        不用纯左右侧面(侧脸在小尺寸下不好看), 平移时用侧前方四分之三视角。
+     8 帧模式(旧):   0 东 / 1 东南 / 2 南 / 3 西南 / 4 西 / 5 西北 / 6 北 / 7 东北
+        按素材条目的 frames 自动选择, 放 4 帧就是 4 向, 放 8 帧就是 8 向。
+     没有 <key>_dir 素材时就退回单图 + 水平翻转, 行为与旧版完全一致。 */
+  dirFrameIndex(p, frames) {
+    // p.face 是玩家当前朝向角(移动时更新, 出招时转向目标), 没有就退回移动方向
+    let a;
+    if (typeof p.face === 'number') a = p.face;
+    else {
+      const m = p.lastMove;
+      a = (m && (m.x || m.y)) ? Math.atan2(m.y, m.x) : 0;
+    }
+
+    if (frames === 8) return ((Math.round(a / (Math.PI / 4)) % 8) + 8) % 8;
+
+    const dx = Math.cos(a);
+    const dy = Math.sin(a);
+    const EPS = 0.38;                      // ≈22°: 小于它算"正上/正下/正左右"
+    if (dy < -EPS) return 3;               // 往上走 → 背面
+    if (dy > EPS) {
+      if (dx > EPS) return 0;              // 右下 → 东南
+      if (dx < -EPS) return 2;             // 左下 → 西南
+      return 1;                            // 正下 → 正面
+    }
+    return dx >= 0 ? 0 : 2;                // 纯左右 → 侧前方四分之三
+  },
+
+  playerArt(p, skinKey) {
+    const dirEntry = Assets.entry('player', skinKey + '_dir');
+    if (dirEntry && dirEntry.ready && dirEntry.frames > 1) {
+      return { key: skinKey + '_dir', frame: this.dirFrameIndex(p, dirEntry.frames), flip: 1 };
+    }
+    return {
+      key: skinKey,
+      frame: undefined,
+      flip: p.facing || (p.lastMove.x < 0 ? -1 : 1)
+    };
+  },
+
   drawPlayerSprite(ctx, p, key, size, pose, face, opt) {
     opt = opt || {};
+    const art = this.playerArt(p, key);
     ctx.save();
     ctx.translate(p.x + pose.lunge * face, p.y + pose.bob + (pose.lift || 0));
-    ctx.scale(face, 1);
+    ctx.scale(art.flip, 1);
     ctx.rotate(pose.rot);
     ctx.scale(pose.sx, pose.sy);
 
@@ -708,7 +772,8 @@ const UI = {
       ctx.shadowColor = 'rgba(255,240,245,0.95)';
       ctx.shadowBlur = 16;
     }
-    Assets.draw(ctx, 'player', key, 0, 0, size, size, {
+    Assets.draw(ctx, 'player', art.key, 0, 0, size, size, {
+      frame: art.frame,
       time: opt.time !== undefined ? opt.time : p.walk,
       alpha: opt.alpha === undefined ? 1 : opt.alpha
     });
@@ -774,6 +839,32 @@ const UI = {
     // 难度徽章
     this.label(ctx, g.mods.name, w - 24, 58, 11, g.mods.color, 700, 'right');
 
+    // 威胁等级: 9 格刻度 + 名称, 让「怪越来越硬」有可读的进度
+    const th = g.threat || 1;
+    const thName = CONTENT.threat.names[th - 1];
+    const thCol = CONTENT.threat.colors[th - 1];
+    const thX = 20, thY = 64;
+    this.label(ctx, '威胁', thX, thY, 10, C.dim, 700);
+    this.label(ctx, th + ' ' + thName, thX + 30, thY, 11, thCol, 700);
+    const pipN = 9, pipW = 12, pipGap = 3;
+    const pipX = thX + 30 + 52;
+    for (let i = 0; i < pipN; i++) {
+      const on = i < th;
+      const last = i === th - 1;
+      ctx.fillStyle = on ? (last ? thCol : 'rgba(120,170,255,0.45)') : 'rgba(255,255,255,0.09)';
+      roundRect(ctx, pipX + i * (pipW + pipGap), thY - 5, pipW, 10, 3);
+      ctx.fill();
+      if (last && g.threatFlash > 0) {
+        ctx.save();
+        ctx.globalAlpha = Math.min(1, g.threatFlash) * 0.8;
+        ctx.strokeStyle = thCol;
+        ctx.lineWidth = 2;
+        roundRect(ctx, pipX + i * (pipW + pipGap) - 2, thY - 7, pipW + 4, 14, 4);
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+
     // 下一只 Boss 倒计时
     let nextBoss = null;
     for (let i = 0; i < CONTENT.bossTimes.length; i++) {
@@ -795,6 +886,13 @@ const UI = {
         const y = 78 + bossRows * 30;
         this.label(ctx, b.name + (b.tag ? ' · ' + b.tag : '') + '  ' + (bossRows + 1) + '/' + g.bosses.length,
           w / 2, y - 8, 11, b.baseColor, 700, 'center');
+        // 狂暴倒计时: 让 DPS 门槛提前可见, 而不是突然开始回血
+        if (b.enraged) {
+          this.label(ctx, '狂暴中', bx + bw, y - 8, 10, '#ff6b8b', 700, 'right');
+        } else if (b.enrageLim && b.aliveT !== undefined) {
+          const left = b.enrageLim - b.aliveT;
+          if (left <= 15) this.label(ctx, '狂暴 ' + Math.ceil(left) + 's', bx + bw, y - 8, 10, '#ffa94d', 700, 'right');
+        }
         this.bar(ctx, bx, y, bw, 10, b.hp / b.maxHp, b.baseColor,
           'rgba(255,255,255,0.10)', 5, b.baseColor);
         bossRows++;
@@ -966,91 +1064,238 @@ const UI = {
   },
 
   /* ---------------- 升级选择 ---------------- */
+  /* 全屏 UI 的缩放系数: 只作用于覆盖层(选卡/天赋/结算), 世界层仍用 zoom。
+     旧版所有面板写死 CSS px, 4K 屏上 48px 图标只有屏幕高度的 2%, 所以「看着很小」。 */
+  uiScale(g) {
+    const h = g && g.view ? g.view.h : 720;
+    return clamp(h / 820, 1, 1.5);
+  },
+
   cardRects(g) {
     const { w, h } = g.view;
+    const s = this.uiScale(g);
     const n = Math.max(1, g.offers.length);
-    const cw = Math.min(280, (w - 90) / n - 16);
-    const ch = Math.min(200, Math.max(150, h * 0.26));
-    const gap = 18;
+    const gap = 20 * s;
+    const cw = Math.min(348 * s, (w - 80) / n - gap);
+    const icon = Math.min(120 * s, cw * 0.42);
+    const ch = Math.min(icon + 176 * s, h * 0.54);
     const total = n * cw + (n - 1) * gap;
     const x0 = (w - total) / 2;
-    const y = h / 2 - ch / 2 + 10;
+    const y = h * 0.5 - ch / 2 + 22 * s;
     const rects = [];
     for (let i = 0; i < n; i++) {
-      rects.push({ x: x0 + i * (cw + gap), y, w: cw, h: ch, i });
+      rects.push({ x: x0 + i * (cw + gap), y, w: cw, h: ch, i, icon, s });
     }
     return rects;
+  },
+
+  /* 悬停详情固定在卡片下方(放不下就翻到上方), 跟着鼠标会挡住相邻的卡 */
+  offerDetailRect(g, card) {
+    const { w, h } = g.view;
+    const s = this.uiScale(g);
+    const pw = Math.min(840 * s, w - 60);
+    const ph = 152 * s;
+    let y = card.y + card.h + 14 * s;
+    if (y + ph > h - 12) y = Math.max(12, card.y - ph - 14 * s);
+    return { x: (w - pw) / 2, y, w: pw, h: ph };
+  },
+
+  /* 当前等级 -> 下一等级的可读数值差, 例如 [{label:'伤害', from:'47', to:'62'}] */
+  skillCompare(def, from, to) {
+    const out = [];
+    if (!def || !def.lvl) return out;
+    const a = from > 0 ? def.lvl[from - 1] : null;
+    const b = def.lvl[to - 1];
+    if (!b) return out;
+    for (const k in SKILL_FIELDS) {
+      if (b[k] === undefined) continue;
+      const prev = a && a[k] !== undefined ? a[k] : null;
+      if (prev !== null && prev === b[k]) continue;
+      const f = SKILL_FIELDS[k];
+      out.push({
+        label: f[0],
+        from: prev === null ? null : f[1](prev),
+        to: f[1](b[k])
+      });
+    }
+    const pa = a && a.dot ? a.dot.dps : null;
+    const pb = b.dot ? b.dot.dps : null;
+    if (pb !== null && pa !== pb) {
+      out.push({ label: '灼烧', from: pa === null ? null : pa + '/s', to: pb + '/s' });
+    }
+    return out;
+  },
+
+  drawOfferDetail(g, o, card) {
+    const ctx = g.ctx;
+    const s = this.uiScale(g);
+    const r = this.offerDetailRect(g, card);
+    const pad = 16 * s;
+    const def = o.kind === 'passive' ? null : CONTENT.skills[o.id];
+
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.6)';
+    ctx.shadowBlur = 20;
+    ctx.fillStyle = 'rgba(7,11,20,0.97)';
+    ctx.strokeStyle = o.color;
+    ctx.lineWidth = 1.4;
+    roundRect(ctx, r.x, r.y, r.w, r.h, 12);
+    ctx.fill();
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // 顶部色条
+    ctx.fillStyle = vfxRgba(o.color, 0.55);
+    roundRect(ctx, r.x + pad, r.y + 1, r.w - pad * 2, 2 * s, 1);
+    ctx.fill();
+
+    // 标题行
+    this.iconTile(ctx, r.x + pad + 18 * s, r.y + 30 * s, 34 * s, {
+      color: o.color,
+      iconCat: o.kind === 'passive' ? null : 'skill',
+      iconKey: o.kind === 'passive' ? null : o.id,
+      glyph: o.icon, time: g.time
+    });
+    this.label(ctx, o.title, r.x + pad + 44 * s, r.y + 24 * s, Math.round(18 * s), C.ink, 800);
+    const lvText = o.kind === 'skill' ? '学习 · Lv 1' : ('Lv ' + o.from + ' → ' + o.to);
+    this.label(ctx, lvText + '  ·  ' + o.tag, r.x + pad + 44 * s, r.y + 44 * s,
+      Math.round(12 * s), o.color, 700);
+
+    // 完整描述
+    ctx.font = font(Math.round(13 * s), 500);
+    const descLines = wrapText(ctx, o.desc, r.w - pad * 2);
+    for (let i = 0; i < descLines.length && i < 2; i++) {
+      this.label(ctx, descLines[i], r.x + pad, r.y + 70 * s + i * 18 * s,
+        Math.round(13 * s), 'rgba(205,222,250,0.82)', 500);
+    }
+
+    // 数值对比
+    const rows = def ? this.skillCompare(def, o.from, o.to) : [];
+    if (rows.length) {
+      let cx = r.x + pad;
+      const cy = r.y + 112 * s;
+      for (let i = 0; i < rows.length && i < 8; i++) {
+        const row = rows[i];
+        const text = row.from === null
+          ? row.label + ' ' + row.to
+          : row.label + ' ' + row.from + ' → ' + row.to;
+        ctx.font = font(Math.round(11.5 * s), 600);
+        const tw = ctx.measureText(text).width + 18 * s;
+        if (cx + tw > r.x + r.w - pad) break;
+        ctx.fillStyle = 'rgba(255,255,255,0.07)';
+        roundRect(ctx, cx, cy - 9 * s, tw, 19 * s, 9 * s);
+        ctx.fill();
+        this.label(ctx, text, cx + tw / 2, cy, Math.round(11.5 * s),
+          'rgba(225,238,255,0.9)', 600, 'center');
+        cx += tw + 8 * s;
+      }
+    } else if (o.kind === 'passive') {
+      this.label(ctx, '被动强化 · 每级独立叠加', r.x + pad, r.y + 112 * s,
+        Math.round(11.5 * s), 'rgba(200,220,255,0.55)', 500);
+    }
+    ctx.restore();
   },
 
   drawLevelUp(g) {
     const ctx = g.ctx;
     const { w, h } = g.view;
+    const s = this.uiScale(g);
 
-    ctx.fillStyle = 'rgba(3,5,10,0.72)';
+    ctx.fillStyle = 'rgba(3,5,10,0.78)';
     ctx.fillRect(0, 0, w, h);
 
-    this.label(ctx, '等级提升', w / 2, h / 2 - 150, 30, C.accent, 800, 'center');
-    this.label(ctx, '选择一项强化  ·  按 1 / 2 / 3 或点击',
-      w / 2, h / 2 - 118, 13, C.dim, 600, 'center');
-
     const rects = this.cardRects(g);
+    const top = rects.length ? rects[0].y : h / 2;
+
+    this.label(ctx, '等级提升', w / 2, top - 76 * s, Math.round(30 * s), C.accent, 800, 'center');
+    this.label(ctx, '选择一项强化  ·  按 1 / 2 / 3 或点击  ·  悬停 / Tab 查看详细数值',
+      w / 2, top - 44 * s, Math.round(13 * s), C.dim, 600, 'center');
+
     const mx = Input.mouse.x, my = Input.mouse.y;
+    const onCard = (r) => mx >= r.x && mx <= r.x + r.w && my >= r.y && my <= r.y + r.h;
+    const anyMouse = rects.some(onCard);
+    // 纯键盘: Tab / 方向键选中一张, 鼠标一进卡片就让位给鼠标
+    const focus = (!anyMouse && g.cardFocus >= 0 && g.cardFocus < rects.length) ? g.cardFocus : -1;
+    let hovered = null;
 
     for (let i = 0; i < rects.length; i++) {
       const r = rects[i];
       const o = g.offers[i];
-      const hover = mx >= r.x && mx <= r.x + r.w && my >= r.y && my <= r.y + r.h;
-      const lift = hover ? -4 : 0;
+      const hover = onCard(r) || r.i === focus;
+      if (onCard(r) || r.i === focus) hovered = { o: o, r: r };
+      const lift = hover ? -5 * s : 0;
 
       ctx.save();
       ctx.translate(0, lift);
       if (hover) {
         ctx.shadowColor = o.color;
-        ctx.shadowBlur = 26;
+        ctx.shadowBlur = 30;
       }
-      ctx.fillStyle = hover ? 'rgba(17,26,43,0.98)' : 'rgba(9,13,22,0.92)';
-      ctx.strokeStyle = hover ? o.color : 'rgba(120,170,255,0.25)';
-      ctx.lineWidth = hover ? 2 : 1.4;
-      roundRect(ctx, r.x, r.y, r.w, r.h, 14);
+      ctx.fillStyle = hover ? 'rgba(18,28,46,0.98)' : 'rgba(9,13,22,0.94)';
+      ctx.strokeStyle = hover ? o.color : 'rgba(120,170,255,0.22)';
+      ctx.lineWidth = hover ? 2.2 : 1.4;
+      roundRect(ctx, r.x, r.y, r.w, r.h, 16);
       ctx.fill();
       ctx.stroke();
       ctx.shadowBlur = 0;
 
+      // 顶部色条
+      ctx.fillStyle = vfxRgba(o.color, hover ? 0.9 : 0.5);
+      roundRect(ctx, r.x + r.w / 2 - 34 * s, r.y + 13 * s, 68 * s, 3 * s, 2);
+      ctx.fill();
+
       // 快捷数字
       ctx.fillStyle = 'rgba(255,255,255,0.06)';
-      roundRect(ctx, r.x + 10, r.y + 10, 22, 22, 6);
+      roundRect(ctx, r.x + 12 * s, r.y + 12 * s, 24 * s, 24 * s, 7);
       ctx.fill();
-      this.label(ctx, String(i + 1), r.x + 21, r.y + 22, 12, C.dim, 700, 'center');
+      this.label(ctx, String(i + 1), r.x + 24 * s, r.y + 24 * s,
+        Math.round(12 * s), C.dim, 700, 'center');
 
-      // 图标
-      this.iconTile(ctx, r.x + r.w / 2, r.y + 54, 48, {
+      // 竖向堆叠居中: 图标 → 名称 → 标签 → 等级
+      const icon = r.icon;
+      const stackH = icon + 26 * s + 21 * s + 12 * s + 22 * s + 20 * s + 26 * s;
+      let cy = r.y + (r.h - stackH) / 2;
+
+      // 大图标
+      this.iconTile(ctx, r.x + r.w / 2, cy + icon / 2, icon, {
         color: o.color,
         iconCat: o.kind === 'passive' ? null : 'skill',
         iconKey: o.kind === 'passive' ? null : o.id,
         glyph: o.icon,
-        glow: hover ? 18 : 8,
+        glow: hover ? 24 : 12,
         glowColor: o.color,
         time: g.time
       });
+      cy += icon + 26 * s;
 
       // 标题
-      this.label(ctx, o.title, r.x + r.w / 2, r.y + 96, 18, C.ink, 800, 'center');
+      this.label(ctx, o.title, r.x + r.w / 2, cy,
+        Math.round(21 * s), C.ink, 800, 'center');
+      cy += 21 * s + 12 * s;
 
-      // 标签
-      const tagW = o.kind === 'passive' ? 62 : 78;
+      // 类型标签
+      const tagW = (o.kind === 'passive' ? 62 : 78) * s;
       ctx.fillStyle = 'rgba(255,255,255,0.08)';
-      roundRect(ctx, r.x + r.w / 2 - tagW / 2, r.y + 110, tagW, 20, 10);
+      roundRect(ctx, r.x + r.w / 2 - tagW / 2, cy, tagW, 22 * s, 11 * s);
       ctx.fill();
-      this.label(ctx, o.tag, r.x + r.w / 2, r.y + 120, 11, o.color, 700, 'center');
+      this.label(ctx, o.tag, r.x + r.w / 2, cy + 11 * s,
+        Math.round(11 * s), o.color, 700, 'center');
+      cy += 22 * s + 20 * s;
 
-      // 描述
-      ctx.font = font(12.5, 500);
-      const lines = wrapText(ctx, o.desc, r.w - 34);
-      for (let k = 0; k < lines.length && k < 3; k++) {
-        this.label(ctx, lines[k], r.x + r.w / 2, r.y + 148 + k * 18, 12.5,
-          'rgba(210,225,255,0.75)', 500, 'center');
-      }
+      // 只保留「等级升到多少」
+      const lvText = o.kind === 'skill' ? 'Lv 1' : ('Lv ' + o.from + ' → ' + o.to);
+      this.label(ctx, lvText, r.x + r.w / 2, cy,
+        Math.round(23 * s), hover ? o.color : C.ink, 800, 'center');
+
       ctx.restore();
+    }
+
+    if (hovered) this.drawOfferDetail(g, hovered.o, hovered.r);
+    else {
+      const any = rects[rects.length - 1] || { y: h / 2, h: 0 };
+      this.label(ctx, '把光标移到卡上查看技能说明与数值变化',
+        w / 2, Math.min(h - 22, any.y + any.h + 34 * s),
+        Math.round(12 * s), 'rgba(180,205,240,0.5)', 500, 'center');
     }
   },
 
@@ -1484,6 +1729,24 @@ const UI = {
     return best;
   },
 
+  /* 天赋页左侧信息卡的纵向布局（相对 py 的偏移）。
+     属性条目数是变量，所有位置都必须由它推导；写死底边会和最后一行叠字。 */
+  talentSideLayout(branchCount, attrCount) {
+    const branchTop = 38;
+    const rowH = 18;
+    const attrRowH = 16;
+    const divY = branchTop + branchCount * rowH + 2;
+    const attrTitleY = divY + 17;
+    const attrTop = attrTitleY + 17;
+    const rows = Math.max(1, attrCount);
+    const eroY = attrTop + rows * attrRowH + 4;
+    return {
+      branchTop, divY, attrTitleY, attrTop, attrRowH, eroY,
+      ph: eroY + 14,
+      attrBottom: attrTop + (rows - 1) * attrRowH
+    };
+  },
+
   drawTalent(g) {
     const ctx = g.ctx;
     const { w, h } = g.view;
@@ -1663,7 +1926,9 @@ const UI = {
     this.label(ctx, '形象 ' + slot.skin + ' ⇄', skinBtn.x + skinBtn.w / 2,
       skinBtn.y + skinBtn.h / 2, 10, skinHover ? cls.color : C.dim, 600, 'center');
 
-    // 左侧：分支进度 + 永久属性
+    // 左侧：分支进度 + 永久属性 + 敌人侵蚀
+    // 布局用「游标」推进而不是写死底边：属性条目数一变，卡片高度和最后两行会自动跟着走，
+    // 不会再把「敌人 +N% 生命」压在最后一条属性上（旧版固定 py+ph-12，正好压在属性行基线下方 2px）。
     const px = 24, py = 84, pw = 218;
     const attr = [];
     if (bonuses.hpPct) attr.push('生命 +' + Math.round(bonuses.hpPct * 100) + '%');
@@ -1674,7 +1939,14 @@ const UI = {
     if (bonuses.regenAdd) attr.push('回复 +' + (Math.round(bonuses.regenAdd * 10) / 10) + '/s');
     if (bonuses.areaPct) attr.push('范围 +' + Math.round(bonuses.areaPct * 100) + '%');
     if (bonuses.onKill) attr.push('击杀加速 +' + Math.round((bonuses.onKill.mul - 1) * 100) + '%');
-    const ph = 28 + branches.length * 18 + 16 + 16 + Math.max(1, attr.length) * 16 + 12;
+
+    const side = this.talentSideLayout(branches.length, attr.length);
+    const branchTop = side.branchTop;
+    const divY = side.divY;
+    const attrTitleY = side.attrTitleY;
+    const attrTop = side.attrTop;
+    const eroY = side.eroY;
+    const ph = side.ph;
 
     if (w >= 1000) {
       ctx.fillStyle = 'rgba(9,13,22,0.82)';
@@ -1684,8 +1956,8 @@ const UI = {
       ctx.fill();
       ctx.stroke();
 
-      this.label(ctx, '天赋进度', px + 12, py + 17, 11, C.dim, 700);
-      let rowY = py + 38;
+      this.label(ctx, '天赋进度', px + 12, py + 18, 11, C.dim, 700);
+      let rowY = py + branchTop;
       for (let i = 0; i < branches.length; i++) {
         const b = branches[i];
         const prog = Talents.branchProgress(slot, b);
@@ -1700,12 +1972,12 @@ const UI = {
 
       ctx.strokeStyle = 'rgba(120,170,255,0.12)';
       ctx.beginPath();
-      ctx.moveTo(px + 12, rowY + 2);
-      ctx.lineTo(px + pw - 12, rowY + 2);
+      ctx.moveTo(px + 12, py + divY);
+      ctx.lineTo(px + pw - 12, py + divY);
       ctx.stroke();
 
-      this.label(ctx, '永久属性', px + 12, rowY + 18, 11, C.dim, 700);
-      let ay = rowY + 36;
+      this.label(ctx, '永久属性', px + 12, py + attrTitleY, 11, C.dim, 700);
+      let ay = py + attrTop;
       if (!attr.length) {
         this.label(ctx, '尚未点亮天赋', px + 12, ay, 10, 'rgba(170,195,225,0.5)', 500);
       } else {
@@ -1714,9 +1986,16 @@ const UI = {
           ay += 16;
         }
       }
+
+      // 敌人加强信息：紧跟属性块，并与上方留 4px 呼吸位
+      ctx.strokeStyle = 'rgba(255,150,120,0.14)';
+      ctx.beginPath();
+      ctx.moveTo(px + 12, py + eroY - 9);
+      ctx.lineTo(px + pw - 12, py + eroY - 9);
+      ctx.stroke();
       this.label(ctx, '敌人 +' + Math.round((ero.hp - 1) * 100) + '% 生命 / +' +
-        Math.round((ero.dmg - 1) * 100) + '% 伤害', px + 12, py + ph - 12, 9,
-        'rgba(255,150,120,0.65)', 500);
+        Math.round((ero.dmg - 1) * 100) + '% 伤害', px + 12, py + eroY, 9,
+        'rgba(255,150,120,0.7)', 500);
     }
 
     // 底栏按钮
@@ -1998,6 +2277,7 @@ const UI = {
       ['存活时间', fmtTime(g.t)],
       ['等级', 'Lv ' + g.player.level],
       ['击杀', String(g.kills)],
+      ['威胁等级', String(g.threat || 1) + ' · ' + CONTENT.threat.names[(g.threat || 1) - 1]],
       ['总伤害', Math.round(g.player.damageDealt).toLocaleString()]
     ];
     if (g.runMode === 'slot') {

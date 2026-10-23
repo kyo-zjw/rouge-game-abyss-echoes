@@ -46,8 +46,8 @@ console.log('\n[职业]');
   check('法师基础数值与起始技能正确', () => {
     h.run('GAME.start("mage", "normal");');
     assert(g.player.classId === 'mage', '职业不是 mage');
-    assert(g.player.maxHp === 110, '法师最大生命错误: ' + g.player.maxHp);
-    assert(near(g.player.speed, 184), '法师移速错误');
+    assert(g.player.maxHp === 122, '法师最大生命错误: ' + g.player.maxHp);
+    assert(near(g.player.speed, 190), '法师移速错误');
     assert(near(g.player.dmgMul, 1.10), '法师伤害倍率错误: ' + g.player.dmgMul);
     assert(near(g.player.cdMul, 0.95), '法师冷却倍率错误: ' + g.player.cdMul);
     assert(g.player.skills[0].id === 'fireball', '起始技能不是火球术');
@@ -467,6 +467,48 @@ console.log('\n[动画与特效]');
     assert(out.left === 0, '特效没有自动回收: ' + out.left);
   });
 
+  check('新特效（刀光 / 裂地 / 旋风 / 奥爆 / 龙头）能推送并逐帧渲染', () => {
+    const out = h.run(`(() => {
+      VFX.reset();
+      const slash = VFX.slash(100, 100, 0, 120, 1.6, 'gold', '#ffd166', { heavy: true });
+      VFX.slam(100, 100, 140, 'thunder', '#a29bfe', { debris: 18 });
+      const whirl = VFX.spin(100, 100, 120, 'gold', '#ffd166');
+      VFX.pulse(100, 100, 120, 'arcane', '#b197fc', { heavy: true });
+      VFX.breath(100, 100, 0, 240, 1.5, 'dragon', '#ff9f43');
+      const types = VFX.items.map(i => i.type);
+      let frames = 0;
+      for (let i = 0; i < 90; i++) {
+        VFX.update(1 / 60);
+        VFX.draw(GAME.ctx, 'ground');
+        VFX.draw(GAME.ctx, 'over');
+        frames++;
+      }
+      return { types, frames, left: VFX.items.length,
+        slashHeavy: !!slash.heavy, whirlLife: whirl.life };
+    })()`);
+    for (const t of ['slash', 'crack', 'debris', 'whirl', 'pulse', 'breath']) {
+      assert(out.types.indexOf(t) >= 0, '缺少特效: ' + t);
+    }
+    assert(out.frames === 90, '渲染帧数不对');
+    assert(out.left === 0, '新特效没有回收干净: ' + out.left);
+    assert(out.slashHeavy, '重击刀光没有标记 heavy');
+  });
+
+  check('特效密度系数能裁剪粒子数', () => {
+    const out = h.run(`(() => {
+      VFX.reset();
+      const n = VFX.quality;
+      VFX.quality = 0.5;
+      const half = VFX.count(16);
+      VFX.quality = 1;
+      const full = VFX.count(16);
+      VFX.quality = n;
+      return { half, full };
+    })()`);
+    assert(out.full === 16, '正常密度粒子数不对: ' + out.full);
+    assert(out.half === 8, '低配密度应该减半: ' + out.half);
+  });
+
   check('龙息生成地面焦痕与火焰层，能完整绘制', () => {
     const out = h.run(`(() => {
       VFX.reset();
@@ -696,6 +738,42 @@ console.log('\n[Boss]');
     h.run('GAME.start("warrior", "normal"); GAME.forceBossAlt = true; GAME.spawnBoss(1); GAME.spawnBoss(2); GAME.spawnBoss(3); GAME.spawnBoss(4); GAME.spawnBoss(5);');
     g.render();
   });
+
+  check('威胁等级随时间上升, 封顶 9 级, HUD 全程能画', () => {
+    const out = h.run(`(() => {
+      GAME.start('warrior', 'normal');
+      const seen = [];
+      // 用真实的 updateWorld 推进, 只采样威胁等级
+      GAME.t = 0; GAME.updateWorld(1 / 60);
+      seen.push({ t: 0, lv: GAME.threat });
+      for (let s = 0; s < 900; s += 30) {
+        GAME.t = s;
+        GAME.updateWorld(1 / 60);
+        seen.push({ t: s + 1, lv: GAME.threat });
+      }
+      // 每一级都画一次 HUD
+      let maxLv = 0;
+      for (const s of seen) {
+        if (s.lv > maxLv) maxLv = s.lv;
+      }
+      let drawn = 0;
+      for (let lv = 1; lv <= 9; lv++) {
+        GAME.threat = lv;
+        GAME.render();
+        drawn++;
+      }
+      GAME.threat = maxLv;
+      return { seen, maxLv, drawn, names: CONTENT.threat.names.length,
+        colors: CONTENT.threat.colors.length };
+    })()`);
+    assert(out.seen[0].lv === 1, '开局威胁等级应为 1: ' + out.seen[0].lv);
+    assert(out.maxLv >= 6, '15 分钟后威胁等级没有爬升: ' + out.maxLv);
+    assert(out.maxLv <= 9, '威胁等级超过 9: ' + out.maxLv);
+    for (let i = 1; i < out.seen.length; i++) {
+      assert(out.seen[i].lv >= out.seen[i - 1].lv, '威胁等级不能回退');
+    }
+    assert(out.drawn === 9 && out.names === 9 && out.colors === 9, '威胁等级名称/颜色表不是 9 条');
+  });
 }
 
 /* ============ 4. 难度 ============ */
@@ -783,6 +861,70 @@ console.log('\n[升级]');
     assert(lvl === 5, '技能等级超过 5: ' + lvl);
   });
 
+  check('三选一：大图标，详情面板不压卡片也不越界', () => {
+    const out = h.run(`(() => {
+      GAME.start('warrior', 'normal');
+      GAME.gainXp(200);
+      const res = [];
+      const sizes = [[1280, 720], [1920, 1080], [3840, 2160], [1024, 600]];
+      for (const vp of sizes) {
+        GAME.view = { w: vp[0], h: vp[1], dpr: 1 };
+        const rects = UI.cardRects(GAME);
+        const first = rects[0], last = rects[rects.length - 1];
+        const d = UI.offerDetailRect(GAME, first);
+        res.push({
+          w: vp[0], h: vp[1],
+          icon: first.icon, cw: first.w, ch: first.h,
+          x0: first.x, x1: last.x + last.w,
+          top: first.y, bottom: first.y + first.h,
+          d: d,
+          from: GAME.offers[0].from, to: GAME.offers[0].to,
+          kinds: GAME.offers.map(o => o.kind)
+        });
+      }
+      return res;
+    })()`);
+    for (const r of out) {
+      assert(r.icon >= 110, r.w + 'x' + r.h + ' 图标太小: ' + r.icon);
+      assert(r.x0 >= 0 && r.x1 <= r.w, r.w + 'x' + r.h + ' 卡片横向越界');
+      assert(r.top >= 0 && r.bottom <= r.h, r.w + 'x' + r.h + ' 卡片纵向越界');
+      assert(r.d.x >= 0 && r.d.x + r.d.w <= r.w, r.w + 'x' + r.h + ' 详情面板横向越界');
+      assert(r.d.y >= 0 && r.d.y + r.d.h <= r.h, r.w + 'x' + r.h + ' 详情面板纵向越界');
+      const apart = r.d.y >= r.bottom + 6 || r.d.y + r.d.h <= r.top - 6;
+      assert(apart, r.w + 'x' + r.h + ' 详情面板压住了卡片');
+      assert(typeof r.from === 'number' && typeof r.to === 'number', '卡片缺少等级区间');
+    }
+  });
+
+  check('技能卡展示的等级区间与当前等级一致', () => {
+    const info = h.run(`(() => {
+      GAME.start('warrior', 'normal');
+      const p = GAME.player;
+      const w = p.skill('heroic_strike');
+      const up = makeOffer(p, { kind: 'up', id: 'heroic_strike' });
+      const skill = makeOffer(p, { kind: 'skill', id: 'cleave' });
+      w.lvl = 3;
+      const up3 = makeOffer(p, { kind: 'up', id: 'heroic_strike' });
+      p.passives.vigor = 2;
+      const pas = makeOffer(p, { kind: 'passive', id: 'vigor' });
+      return { up: [up.from, up.to], up3: [up3.from, up3.to], skill: [skill.from, skill.to], pas: [pas.from, pas.to] };
+    })()`);
+    assert(info.up[0] === 1 && info.up[1] === 2, '1 级技能升级区间不对: ' + info.up);
+    assert(info.up3[0] === 3 && info.up3[1] === 4, '3 级技能升级区间不对: ' + info.up3);
+    assert(info.skill[0] === 0 && info.skill[1] === 1, '新技能应该是 0 → 1');
+    assert(info.pas[0] === 2 && info.pas[1] === 3, '被动升级区间不对: ' + info.pas);
+  });
+
+  check('悬停详情能列出数值变化', () => {
+    const rows = h.run(`(() => {
+      const def = CONTENT.skills.heroic_strike;
+      return UI.skillCompare(def, 1, 2);
+    })()`);
+    assert(rows.length >= 2, '数值对比条数太少: ' + rows.length);
+    assert(rows.some(r => r.label === '伤害'), '缺少伤害对比');
+    assert(rows.every(r => r.to !== undefined && r.to !== null), '对比缺少新值');
+  });
+
   check('升级卡 / 结算 / 标题 / 职业选择都能渲染', () => {
     h.run('GAME.start("mage", "normal"); GAME.gainXp(50);');
     g.render();
@@ -847,7 +989,7 @@ console.log('\n[存档与拾取]');
     g.update(1 / 60);
     assert(g.state === 'playing', '没有重开');
     assert(g.player.classId === 'mage', '重开后职业变了: ' + g.player.classId);
-    assert(g.player.maxHp === 110, '重开后法师数值不对');
+    assert(g.player.maxHp === 122, '重开后法师数值不对');
   });
 }
 
@@ -1190,11 +1332,12 @@ console.log('\n[金币与深渊侵蚀]');
     }
   });
 
-  check('深渊侵蚀按总等级计算，满级 +20% 生命 / +8% 伤害', () => {
+  check('深渊侵蚀按总等级计算，满级 +9.6% 生命 / +4% 伤害', () => {
     const h = createHarness();
     const ero = h.run('Talents.erosion(84)');
     assert(ero.stacks === 8, '满级层数不对: ' + ero.stacks);
-    assert(near(ero.hp, 1.2) && near(ero.dmg, 1.08), '满级侵蚀倍率不对');
+    assert(near(ero.hp, 1.096) && near(ero.dmg, 1.04), '满级侵蚀倍率不对');
+    assert(ero.hp < 1.15, '侵蚀不该再吃掉天赋树的一大半收益');
     const ero0 = h.run('Talents.erosion(9)');
     assert(ero0.stacks === 0 && ero0.hp === 1 && ero0.dmg === 1, '低等级侵蚀不应生效');
   });
@@ -1207,8 +1350,26 @@ console.log('\n[金币与深渊侵蚀]');
     const key = Object.keys(h.run('CONTENT.enemies'))[0];
     const base = h.run('CONTENT.enemies["' + key + '"]');
     const e = g.spawnEnemy(key, 100, 100);
-    assert(near(e.maxHp, base.hp * g.mods.enemyHp * 1.2, 0.01), '敌人生命没有乘侵蚀');
-    assert(near(e.dmg, base.dmg * g.mods.enemyDmg * 1.08, 0.01), '敌人伤害没有乘侵蚀');
+    assert(near(e.maxHp, base.hp * g.diff.hp * g.mods.enemyHp * 1.2, 0.01), '敌人生命没有乘侵蚀');
+    assert(near(e.dmg, base.dmg * g.diff.dmg * g.mods.enemyDmg * 1.08, 0.01), '敌人伤害没有乘侵蚀');
+  });
+
+  check('天赋页左侧信息卡：属性行不会与敌人侵蚀行重叠', () => {
+    const h = createHarness();
+    const res = h.run(`(() => {
+      const out = [];
+      for (let rows = 0; rows <= 8; rows++) {
+        const L = UI.talentSideLayout(3, rows);
+        const n = Math.max(1, rows);
+        out.push({ rows, last: L.attrTop + (n - 1) * L.attrRowH, ero: L.eroY, ph: L.ph });
+      }
+      return out;
+    })()`);
+    for (const r of res) {
+      assert(r.ero - r.last >= 12, r.rows + ' 条属性时侵蚀行贴得太近: ' + (r.ero - r.last));
+      assert(r.ero + 12 <= r.ph, r.rows + ' 条属性时侵蚀行超出卡片底边');
+      assert(r.ph <= 320, r.rows + ' 条属性时卡片过高: ' + r.ph);
+    }
   });
 
   check('槽位页 / 天赋页 / 金币 HUD 渲染不报错', () => {
@@ -1401,6 +1562,144 @@ console.log('\n[素材与性能]');
     const perFrame = ms / frames;
     console.log('    → 平均 ' + perFrame.toFixed(3) + ' ms/帧 (400 敌人, 无渲染)');
     assert(perFrame < 8, '单帧逻辑耗时过高: ' + perFrame.toFixed(2) + 'ms');
+  });
+}
+
+/* ============ 朝向图集 ============ */
+console.log('\n[朝向图集]');
+{
+  const h = createHarness();
+
+  // 伪造图集条目, 截获 Assets.draw 拿到的 frame
+  h.run(`
+    window.__frames = [];
+    Assets.map['player:warrior_1_dir'] = {
+      src: 'player/warrior_1_dir.png', ready: true, failed: false,
+      frames: 4, frameW: 512, frameH: 512, fps: 0,
+      img: { width: 2048, height: 512 }
+    };
+    window.__origDraw = Assets.draw;
+    Assets.draw = function (ctx, cat, key, x, y, w, h, opt) {
+      if (key === 'warrior_1_dir') window.__frames.push(opt.frame);
+      return window.__origDraw.call(this, ctx, cat, key, x, y, w, h, opt);
+    };
+    GAME.start('warrior', 'normal');
+    // Node 里没有 Image, Assets.init 会直接早退, 所以手动把两个条目都塞进 map
+    Assets.map['player:warrior_1'] = {
+      src: 'player/warrior_1.png', ready: true, failed: false,
+      frames: 1, frameW: 0, frameH: 0, fps: 8, img: { width: 512, height: 512 }
+    };
+  `);
+
+  const frameAt = angle => h.run(`(() => {
+    window.__frames.length = 0;
+    GAME.player.face = ${angle};
+    UI.drawPlayer(GAME);
+    return window.__frames[window.__frames.length - 1];
+  })()`);
+
+  check('四方向映射: 右下→0 正下→1 左下→2 上→3', () => {
+    assert(frameAt('Math.PI / 2') === 1, '正下应为正面(1)');
+    assert(frameAt('Math.PI / 4') === 0, '右下应为东南(0)');
+    assert(frameAt('Math.PI * 3 / 4') === 2, '左下应为西南(2)');
+    assert(frameAt('-Math.PI / 2') === 3, '正上应为背面(3)');
+    assert(frameAt('-Math.PI * 3 / 4') === 3, '左上应回落到背面(3)');
+    assert(frameAt('-Math.PI / 4') === 3, '右上应回落到背面(3)');
+  });
+
+  check('纯左右用侧前方四分之三, 不用纯侧面', () => {
+    assert(frameAt('0') === 0, '正右应为东南(0)');
+    assert(frameAt('Math.PI') === 2, '正左应为西南(2)');
+  });
+
+  check('图集条目仍是 4 帧时不会读到越界帧', () => {
+    const got = h.run(`(() => {
+      const p = GAME.player;
+      const out = [];
+      for (let i = 0; i < 32; i++) {
+        p.face = i / 32 * Math.PI * 2;
+        const f = UI.dirFrameIndex(p, 4);
+        if (f < 0 || f > 3) out.push(i + ':' + f);
+      }
+      return out;
+    })()`);
+    assert(got.length === 0, '出现了越界帧号: ' + JSON.stringify(got));
+  });
+
+  check('放 8 帧素材时自动回到八方向映射', () => {
+    const got = h.run(`(() => {
+      const p = GAME.player;
+      const angles = [0, Math.PI / 4, Math.PI / 2, Math.PI * 3 / 4,
+                      Math.PI, -Math.PI * 3 / 4, -Math.PI / 2, -Math.PI / 4];
+      return angles.map(a => { p.face = a; return UI.dirFrameIndex(p, 8); });
+    })()`);
+    for (let i = 0; i < 8; i++) assert(got[i] === i, '八方向第 ' + i + ' 项错: ' + got[i]);
+  });
+
+  check('没有 _dir 素材时退回单图, 不传 frame', () => {
+    const info = h.run(`(() => {
+      const p = GAME.player;
+      const orig = Assets.entry;
+      Assets.entry = function (cat, key) {
+        if (key === 'warrior_1_dir') return null;
+        return orig.call(this, cat, key);
+      };
+      window.__frames.length = 0;
+      p.face = Math.PI / 2;
+      UI.drawPlayer(GAME);
+      Assets.entry = orig;
+      return { frames: window.__frames.slice(), dirIndex: UI.dirFrameIndex(p, 4) };
+    })()`);
+    assert(info.frames.length === 0, '缺少 _dir 素材时不该用图集');
+    assert(info.dirIndex === 1, '朝向角 π/2 应映射到第 1 帧: ' + info.dirIndex);
+  });
+
+  check('图集尺寸与切帧参数一致', () => {
+    const info = h.run(`(() => {
+      const e = CONTENT.assets.player.warrior_1_dir;
+      return { frames: e.frames, frameW: e.frameW, frameH: e.frameH, src: e.src };
+    })()`);
+    assert(info.frames === 4, '帧数不是 4: ' + info.frames);
+    assert(info.frameW === 512 && info.frameH === 512, '帧尺寸不是 512: ' + info.frameW + 'x' + info.frameH);
+    const fs = require('fs');
+    const p = require('path').join(__dirname, '..', 'assets', info.src);
+    if (fs.existsSync(p)) {
+      const buf = fs.readFileSync(p);
+      // PNG IHDR: 宽高在第 16~23 字节
+      const w = buf.readUInt32BE(16);
+      const h2 = buf.readUInt32BE(20);
+      assert(w === info.frameW * info.frames, '图集宽度应为 ' + (info.frameW * info.frames) + ', 实际 ' + w);
+      assert(h2 === info.frameH, '图集高度应为 ' + info.frameH + ', 实际 ' + h2);
+    }
+  });
+
+  check('龙息龙首走程序化火焰画法，不依赖外部贴图', () => {
+    const out = h.run(`(() => {
+      let touched = 0;
+      const origEntry = (typeof Assets !== 'undefined') ? Assets.entry : null;
+      if (origEntry) Assets.entry = () => { touched++; return null; };
+      VFX.reset();
+      VFX.breath(100, 100, 0.4, 220, 1.5, 'dragon', '#ff9f43');
+      const types = VFX.items.map(i => i.type);
+      for (let i = 0; i < 90; i++) { VFX.update(1 / 60); VFX.draw(GAME.ctx, 'over'); }
+      if (origEntry) Assets.entry = origEntry;
+      return { touched, types, items: VFX.items.length };
+    })()`);
+    assert(out.types.indexOf('breath') >= 0, '龙息没有生成火焰层');
+    assert(out.touched === 0, '龙首不该再去读外部贴图: ' + out.touched);
+    assert(out.items === 0, '龙息特效没有回收');
+  });
+
+  check('四个形象都有四方向图集', () => {
+    const got = h.run(`(() => {
+      const out = {};
+      for (const k of ['warrior_1', 'warrior_2', 'mage_1', 'mage_2']) {
+        const e = CONTENT.assets.player[k + '_dir'];
+        out[k] = e ? e.frames : null;
+      }
+      return out;
+    })()`);
+    for (const k in got) assert(got[k] === 4, k + ' 的 _dir 帧数不是 4: ' + got[k]);
   });
 }
 

@@ -63,6 +63,9 @@ class Game {
     this.creatingSlot = null;
     this.erosion = { stacks: 0, hp: 1, dmg: 1 };
     this.erosionOff = false;
+    this.cardFocus = -1;
+    this.threat = 1;
+    this.threatFlash = 0;
     this.runGold = 0;
     this.lastGoldGain = 0;
     this.settled = false;
@@ -76,6 +79,10 @@ class Game {
     this.respecConfirmT = 0;
     this.talentToast = '';
     this.talentToastT = 0;
+
+    // 打击感: 重击命中时的极短定格(秒), 与冷却上限, 避免连续触发变成幻灯片
+    this.hitstop = 0;
+    this.hitstopCd = 0;
 
     this.stars = [];
     for (let i = 0; i < 160; i++) {
@@ -151,8 +158,17 @@ class Game {
     this.debugTree = /[?&]tree=1/.test(search);
     const goldMatch = /[?&]gold=(\d+)/.exec(search);
     if (goldMatch) this.debugGold = Math.max(0, Number(goldMatch[1]) || 0);
-    if (/[?&]talents=full/.test(search)) this.debugTalents = 'full';
+    const talMatch = /[?&]talents=(full|\d+)/.exec(search);
+    if (talMatch) {
+      this.debugTalents = talMatch[1] === 'full' ? 'full' : Number(talMatch[1]);
+    }
     this.erosionOff = /[?&]erosion=0/.test(search);
+    // 低配 / 密集战斗: 特效密度减半, 池子上限下调
+    this.lowFx = /[?&]lowfx=1/.test(search);
+    if (this.lowFx) {
+      VFX.quality = 0.5;
+      VFX.maxItems = 110;
+    }
 
     Assets.init();
     this.reset();
@@ -580,17 +596,26 @@ class Game {
 
     const slot = this.runMode === 'slot' ? this.activeSlot() : null;
     let meta = null;
+    // 调试 / 平衡: talents=full 或 talents=0..100(按比例铺满整棵树)
+    const dbg = this.debugTalents;
+    const dbgPct = typeof dbg === 'number' ? dbg : (dbg === 'full' ? 100 : 0);
     if (slot) {
       meta = Talents.bonuses(slot.classId, slot.talents);
       this.erosion = this.erosionOff
         ? { stacks: 0, hp: 1, dmg: 1 }
         : Talents.erosion(Talents.totalRanks(slot));
-    } else if (this.runMode === 'direct' && this.debugTalents === 'full') {
+    } else if (this.runMode === 'direct' && dbgPct > 0) {
       const all = {};
       const list = Talents.nodes(this.selectedClass);
-      for (let i = 0; i < list.length; i++) all[list[i].id] = list[i].cost.length;
+      for (let i = 0; i < list.length; i++) {
+        const take = Math.floor(list[i].cost.length * dbgPct / 100 + 0.0001);
+        if (take > 0) all[list[i].id] = take;
+      }
       meta = Talents.bonuses(this.selectedClass, all);
-      this.erosion = this.erosionOff ? { stacks: 0, hp: 1, dmg: 1 } : Talents.erosion(84);
+      const ranks = Talents.totalRanks({ classId: this.selectedClass, talents: all });
+      this.erosion = this.erosionOff
+        ? { stacks: 0, hp: 1, dmg: 1 }
+        : Talents.erosion(ranks);
     } else {
       this.erosion = { stacks: 0, hp: 1, dmg: 1 };
     }
@@ -628,6 +653,8 @@ class Game {
     this.settled = false;
 
     this.diff = { hp: 1, dmg: 1, speed: 1 };
+    this.hitstop = 0;
+    this.hitstopCd = 0;
     this.cam.x = this.player.x;
     this.cam.y = this.player.y;
     this.cam.shake = 0;
@@ -826,6 +853,12 @@ class Game {
       burst.t = burst.life * 0.3;
       const aura = VFX.aura(p.x, p.y, 46, 'holy', '#ffe9a8');
       aura.t = aura.life * 0.45;
+      // 踩地板: 裂地 + 碎石
+      const slam = VFX.slam(p.x + 30, p.y + 120, 150, 'thunder', '#a29bfe', { debris: 18 });
+      slam.t = slam.life * 0.42;
+      // 旋风斩: 螺旋气流 + 风环
+      const whirl = VFX.spin(p.x - 40, p.y, 132, 'gold', '#ffd166');
+      whirl.t = whirl.life * 0.5;
       const cone = VFX.cone(p.x - 200, p.y + 45, 0.25, 170, 1.1, 'dragon', '#ff7b5d');
       cone.t = cone.life * 0.3;
       addProj('gold', 'heroic_strike', p.x + 170, p.y - 15, -0.05, 7, 0);
@@ -872,6 +905,9 @@ class Game {
       lightning.t = lightning.life * 0.18;
       const aura = VFX.aura(p.x, p.y, 44, 'arcane', '#b197fc');
       aura.t = aura.life * 0.4;
+      // 奥爆: 能量力场
+      const pulse = VFX.pulse(p.x - 70, p.y - 40, 128, 'arcane', '#b197fc', { heavy: true });
+      pulse.t = pulse.life * 0.38;
       const cone = VFX.cone(p.x + 220, p.y + 20, 0.18, 150, 0.8, 'dragon', '#ff7b5d');
       cone.t = cone.life * 0.34;
     }
@@ -1222,12 +1258,35 @@ class Game {
       return;
     }
 
+    // 命中定格: 冻结逻辑与特效应有的推进, 只留震屏衰减
+    if (this.hitstop > 0) {
+      this.hitstop = Math.max(0, this.hitstop - dt);
+      this.cam.shake = Math.max(0, this.cam.shake - 26 * dt);
+      return;
+    }
+    this.hitstopCd = Math.max(0, this.hitstopCd - dt);
+
     this.t += dt;
+    // 难度曲线: 前 6 分钟线性, 之后二次加速。0 天赋的目标是「打得进但容易崩」,
+    // 满天赋的目标是「轻松割草」, 硬核再往上加密度与后期压力。
+    const mins = this.t / 60;
+    const late = Math.max(0, mins - 6);
+    const lateMul = 1 + late * ((this.mods && this.mods.lateMul) || 0);
     this.diff = {
-      hp: 1 + this.t / 60 * 0.30,
-      dmg: 1 + this.t / 60 * 0.16,
-      speed: 1 + this.t / 300 * 0.18
+      hp: (1 + mins * 0.350 + late * late * 0.030) * lateMul,
+      dmg: (1 + mins * 0.230 + late * late * 0.020) * lateMul,
+      speed: 1 + this.t / 300 * 0.18 * lateMul
     };
+
+    // 威胁等级: 把「怪越来越硬」变成玩家能看见的一条进度 —— 每涨一级播报一次
+    const tl = this.threatLevel();
+    if (tl > this.threat) {
+      this.threat = tl;
+      this.threatFlash = 1;
+      this.announce('威胁等级 ' + tl + ' · ' + CONTENT.threat.names[tl - 1]);
+      Sfx.play('level');
+    }
+    if (this.threatFlash > 0) this.threatFlash = Math.max(0, this.threatFlash - dt * 1.2);
 
     const p = this.player;
     if (this.autoplay) this.autopilot();
@@ -1299,6 +1358,14 @@ class Game {
     if (this.announceT > 0) this.announceT -= dt;
   }
 
+  /* 重击命中定格: 同一时刻只触发一次, 0.45s 冷却, 避免连击时变成幻灯片 */
+  freeze(sec) {
+    if (!(sec > 0) || this.hitstopCd > 0) return false;
+    this.hitstop = Math.max(this.hitstop, sec);
+    this.hitstopCd = 0.45;
+    return true;
+  }
+
   screenToWorld(sx, sy) {
     const { w, h } = this.view;
     return {
@@ -1355,8 +1422,13 @@ class Game {
     for (let i = bs.length - 1; i >= 0; i--) if (bs[i].dead) bs.splice(i, 1);
   }
 
-  /* ---------------- 升级流程 ---------------- */
-  updateLevelUp(dt) {
+  /* 威胁等级: 由当前难度曲线换算成 1~9 级, 给 HUD 与播报用(约每 1~2 分钟涨一级) */
+  threatLevel() {
+    const hp = (this.diff && this.diff.hp) || 1;
+    return clamp(1 + Math.floor((hp - 1) / 0.55), 1, 9);
+  }
+
+  /* ---------------- 升级流程 ---------------- */  updateLevelUp(dt) {
     this.levelupT += dt;
     if (this.levelupT < 0.16) return;
 
@@ -1405,6 +1477,13 @@ class Game {
       return;
     }
 
+    // Tab / 左右方向键: 纯键盘也能看详细数值(鼠标悬停优先)
+    if (Input.hit('Tab') || Input.hit('ArrowRight')) {
+      this.cardFocus = ((this.cardFocus | 0) + 1) % Math.max(1, this.offers.length);
+    } else if (Input.hit('ArrowLeft')) {
+      this.cardFocus = ((this.cardFocus | 0) - 1 + this.offers.length) % Math.max(1, this.offers.length);
+    }
+
     if (Input.hit('Digit1') || Input.hit('Numpad1')) { this.choose(0); return; }
     if (Input.hit('Digit2') || Input.hit('Numpad2')) { this.choose(1); return; }
     if (Input.hit('Digit3') || Input.hit('Numpad3')) { this.choose(2); return; }
@@ -1432,6 +1511,7 @@ class Game {
     }
     this.offers = offers;
     this.levelupT = 0;
+    this.cardFocus = -1;
     this.state = 'levelup';
     Sfx.play('level');
   }

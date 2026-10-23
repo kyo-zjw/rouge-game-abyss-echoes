@@ -1,8 +1,8 @@
-/* 平衡扫描 v0.2: 多职业 / 多难度 / 多种子
+/* 平衡扫描 v0.3: 多职业 / 多难度 / 多种子 / 多天赋档位
    运行: node test/balance.js [局数] [both|warrior|mage] [normal|hardcore|both]
    例:   node test/balance.js 8 both normal
-   满树: TALENTS=full node test/balance.js 4 both normal
-   关侵蚀: EROSION=0 TALENTS=full node test/balance.js 4 both normal  */
+   天赋档位: TALENTS=full | TALENTS=50 (按比例铺满, 0 = 空树)
+   关侵蚀:   EROSION=0 TALENTS=full node test/balance.js 4 both normal  */
 
 'use strict';
 
@@ -11,7 +11,8 @@ const { createHarness } = require('./harness');
 const runs = Number(process.argv[2] || 8);
 const classArg = process.argv[3] || 'both';
 const diffArg = process.argv[4] || 'normal';
-const fullTalents = process.env.TALENTS === 'full';
+const talEnv = process.env.TALENTS === undefined ? '' : String(process.env.TALENTS).trim();
+const talents = talEnv === 'full' ? 'full' : (talEnv === '' ? null : Number(talEnv));
 const erosion = process.env.EROSION !== '0';
 
 const classes = classArg === 'both' ? ['warrior', 'mage'] : [classArg];
@@ -32,7 +33,7 @@ for (const cls of classes) {
         try {
           seedRandom(SEED);
           GAME.autoplay = true;
-          GAME.debugTalents = FULL ? 'full' : null;
+          GAME.debugTalents = FULL;
           GAME.erosionOff = !ERO;
           GAME.start(CLS, DIFF);
 
@@ -61,7 +62,7 @@ for (const cls of classes) {
           r.error = (err && err.stack) || String(err);
         }
         return r;
-      })(${s}, ${JSON.stringify(cls)}, ${JSON.stringify(diff)}, ${fullTalents}, ${erosion})
+      })(${s}, ${JSON.stringify(cls)}, ${JSON.stringify(diff)}, ${JSON.stringify(talents)}, ${erosion})
       `);
       rows.push(out);
     }

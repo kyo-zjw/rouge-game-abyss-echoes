@@ -142,7 +142,8 @@ const Sfx = {
   play(name) {
     if (!this.enabled || !this.ac) return;
     const now = this.ac.currentTime;
-    const gates = { shoot: 0.06, hit: 0.035, kill: 0.03, pick: 0.04, hurt: 0.1, coin: 0.04, buy: 0.08 };
+    const gates = { shoot: 0.06, hit: 0.035, kill: 0.03, pick: 0.04, hurt: 0.1, coin: 0.04, buy: 0.08,
+      slash: 0.05, heavy: 0.08, quake: 0.22, whirl: 0.16 };
     const gate = gates[name] || 0;
     if (gate && this._last[name] && now - this._last[name] < gate) return;
     this._last[name] = now;
@@ -165,6 +166,25 @@ const Sfx = {
       case 'breath':
         this.tone(165, 52, 0.62, 'sawtooth', 0.10);
         this.tone(310, 96, 0.38, 'triangle', 0.055, 0.03);
+        break;
+      case 'slash':
+        // 三层: 低频破空 + 中频刃啸 + 高频金属泛音
+        this.tone(420, 120, 0.13, 'sawtooth', 0.05);
+        this.tone(1180, 640, 0.09, 'triangle', 0.035, 0.01);
+        this.tone(2400, 1500, 0.06, 'sine', 0.018, 0.02);
+        break;
+      case 'heavy':
+        this.tone(180, 46, 0.22, 'square', 0.10);
+        this.tone(92, 38, 0.30, 'sawtooth', 0.09, 0.01);
+        this.tone(1600, 900, 0.07, 'triangle', 0.028, 0.02);
+        break;
+      case 'quake':
+        this.tone(64, 28, 0.55, 'sawtooth', 0.16);
+        this.tone(120, 40, 0.32, 'square', 0.08, 0.02);
+        break;
+      case 'whirl':
+        this.tone(300, 900, 0.30, 'sawtooth', 0.045);
+        this.tone(900, 320, 0.26, 'triangle', 0.03, 0.06);
         break;
       case 'win':
         [523, 659, 784, 1046, 1318].forEach((f, i) => this.tone(f, f, 0.28, 'triangle', 0.1, i * 0.11));
@@ -388,7 +408,11 @@ const Assets = {
     let sx = 0;
     let sy = 0;
     if (e.frames > 1 && e.frameW > 0 && e.frameH > 0) {
-      const f = Math.floor((opt.time || 0) * e.fps) % e.frames;
+      // opt.frame: 显式指定第几帧(八方向图集按朝向取帧); 不给就按时间自动播放
+      const raw = (opt.frame === undefined || opt.frame === null)
+        ? Math.floor((opt.time || 0) * e.fps)
+        : Math.round(opt.frame);
+      const f = ((raw % e.frames) + e.frames) % e.frames;
       sx = f * e.frameW;
       sy = 0;
       sw = e.frameW;

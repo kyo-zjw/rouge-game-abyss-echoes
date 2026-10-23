@@ -158,6 +158,28 @@ node abyss-echoes/tools/seedream.mjs reprocess --preset boss --tol 96
 
 `reprocess` 会直接覆盖 `assets/` 下的成品；改阈值前建议先备份 `assets/` 或只加 `--dry-run` 看路径。背景默认不重跑，需要时加 `--include-backgrounds`。
 
+## 朝向图集：make-dir-sheet.py
+
+`seedream.mjs` 只出「朝右」单图。要把绿幕方向渲染拼成引擎能用的**横向图集**，用这个脚本（纯本地，不花钱）：
+
+```bash
+# --frames 决定输出哪些帧、按什么顺序排；不给就是 8 向全要
+python tools/make-dir-sheet.py \
+  --dir   <绿幕图目录> \
+  --out   assets/player/warrior_1_dir.png \
+  --cell  512 \
+  --frames downRight,front,downLeft,back \
+  --debug
+```
+
+- 可选方向名：`right downRight front downLeft left upLeft back upRight`。
+- 当前游戏用 4 帧（东南/南/西南/北）：8 向在 78px 下太琐碎，纯侧面又不好看。
+- 抠像直接复用 `seedream-post.py` 的 `key_background / despill / premultiplied_resize`，所以边缘口径和其余 83 张完全一致。
+- 所有帧共用**同一个缩放系数**（按主体高度中位数算），因此不同朝向的体型不会忽大忽小；每帧底部对齐、水平居中。
+- `--debug` 额外写棋盘格 `.preview.png`。
+
+引擎侧怎么接线见 `assets/README.md` 的「朝向图集」。
+
 ## 常见问题
 
 | 现象 | 处理 |

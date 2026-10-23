@@ -49,18 +49,30 @@ const CONTENT = {
   sceneCount: 3,                 // 背景场景数量: scene_1 ~ scene_3
 
   /* ---------------- 难度 ---------------- */
+  /* 威胁等级: 把「怪越来越硬」做成玩家看得懂的 9 级刻度(HUD 与播报共用) */
+  threat: {
+    names: ['低语', '涌动', '侵蚀', '沸腾', '狂潮', '深渊', '崩坏', '终末', '回响'],
+    colors: ['#63e6ff', '#74c0fc', '#a29bfe', '#b197fc', '#ffd166',
+      '#ffa94d', '#ff8c42', '#ff6b8b', '#ff2d55']
+  },
+
   difficulties: {
     normal: {
       id: 'normal', name: '正常', color: '#63e6ff',
       enemyHp: 1.00, enemyDmg: 0.90, spawnMul: 0.90,
       bossHp: 1.00, bossDmg: 0.90,
-      healChance: 0.05, xpMul: 1.00
+      healChance: 0.05, xpMul: 1.00,
+      maxEnemies: 320, eliteEvery: 45
     },
+    // 硬核 = 密度压力(满屏割草) + 明显更高的数值, 但经验不额外放水:
+    // spawnMul 是「刷新间隔倍数」, 0.60 表示怪比正常多 ~50%; 上限更高、精英更频繁;
+    // 实测给 xpMul 1.15 会让玩家多升 20 级, 反而把硬核变成白送, 所以压到 0.90。
     hardcore: {
       id: 'hardcore', name: '硬核', color: '#ff6b8b',
-      enemyHp: 1.20, enemyDmg: 1.05, spawnMul: 0.85,
-      bossHp: 1.15, bossDmg: 1.05,
-      healChance: 0.02, xpMul: 0.95
+      enemyHp: 1.40, enemyDmg: 1.20, spawnMul: 0.60,
+      bossHp: 1.50, bossDmg: 1.30, enrageMul: 0.85,
+      healChance: 0.02, xpMul: 0.55, lateMul: 0.06,
+      maxEnemies: 420, eliteEvery: 26, batchBonus: 2
     }
   },
 
@@ -86,7 +98,7 @@ const CONTENT = {
       id: 'mage', name: '法师', icon: '🔥', color: '#74c0fc',
       role: '远程 / AOE',
       desc: '远程爆发与控制，身板脆，靠屏障和闪现保命。',
-      hp: 110, speed: 184, armor: 0.00,
+      hp: 122, speed: 190, armor: 0.00,
       dmgMul: 1.10, cdMul: 0.95, magnet: 130,
       startSkill: 'fireball',
       displacement: 'blink',
@@ -646,9 +658,14 @@ const CONTENT = {
     basePath: 'assets/',
     player: {
       warrior_1: 'player/warrior_1.png',
+      // 四方向朝向图集: 4 帧横排 512x512, 帧序 = 东南/南/西南/北
+      warrior_1_dir: { src: 'player/warrior_1_dir.png', frames: 4, frameW: 512, frameH: 512, fps: 0 },
       warrior_2: 'player/warrior_2.png',
+      warrior_2_dir: { src: 'player/warrior_2_dir.png', frames: 4, frameW: 512, frameH: 512, fps: 0 },
       mage_1: 'player/mage_1.png',
-      mage_2: 'player/mage_2.png'
+      mage_1_dir: { src: 'player/mage_1_dir.png', frames: 4, frameW: 512, frameH: 512, fps: 0 },
+      mage_2: 'player/mage_2.png',
+      mage_2_dir: { src: 'player/mage_2_dir.png', frames: 4, frameW: 512, frameH: 512, fps: 0 }
     },
     background: {
       1: 'background/scene_1.png',

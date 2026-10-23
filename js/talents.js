@@ -419,12 +419,15 @@ const Talents = {
     return out;
   },
 
+  /* 深渊侵蚀: 天赋点得越多, 敌人被强化一点。
+     这里只是「别让满树完全无脑」的轻量补偿 —— 台服实测 2.5%/1% 会把整棵树的收益吃掉一半,
+     和「天赋越多越轻松」的目标相反, 所以压到 1.2%/0.5%(满树 +9.6% HP / +4% 伤害)。 */
   erosion(totalRanks) {
     const stacks = Math.min(8, Math.max(0, Math.floor(totalRanks / 10)));
     return {
       stacks: stacks,
-      hp: 1 + 0.025 * stacks,
-      dmg: 1 + 0.01 * stacks
+      hp: 1 + 0.012 * stacks,
+      dmg: 1 + 0.005 * stacks
     };
   },
 

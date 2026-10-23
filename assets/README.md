@@ -107,6 +107,31 @@ player: {
 
 当前技能特效全部是 Canvas 程序化绘制（`js/vfx.js`），不依赖额外贴图，所以 `assets/` 里没有特效图也不会缺演出。以后如果要换成序列图，可以在 `content.js` 增加 `fx` 资源分组，并在 `VFX.drawProjectile / drawZone` 里优先取图、失败再回退程序化绘制。
 
+## 朝向图集（可选）
+
+玩家默认是「单张朝右 PNG + 水平翻转」。放一张 4 帧横排的 `<skin>_dir.png` 就能升级成**四方向朝向**，引擎会自动优先用它：
+
+```
+assets/player/warrior_1_dir.png   # 2048×512 = 4 帧 × 512×512
+```
+
+- 帧序固定为 **东南 / 南 / 西南 / 北**（`js/ui.js` 的 `dirFrameIndex`）。
+- 之所以不用纯左右侧面：Q 版侧脸在 78px 下不好看；平移时直接用**侧前方四分之三**视角，观感更连贯。
+- 映射规则：往下走看正面、往上走看背面、斜下看对应 45°，纯左右用东南/西南代偿。
+- `content.js` 里对应条目要写 `frames: 4, frameW: 512, frameH: 512`，缺一项就退回单图 + 翻转，不会报错。
+- **放 8 帧也能用**：`dirFrameIndex` 会按 `frames` 自动切到八方向映射（东/东南/南/西南/西/西北/北/东北），素材换掉即可，不用改代码。
+- 图集由 `tools/make-dir-sheet.py` 从绿幕图生成（抠像 + 统一缩放 + 底部对齐，所有帧共用同一缩放系数以保持体型一致）：
+
+```bash
+python tools/make-dir-sheet.py --dir <8张绿幕图目录> \
+  --out assets/player/warrior_1_dir.png --cell 512 \
+  --frames downRight,front,downLeft,back --debug
+```
+
+`--debug` 会额外写一张棋盘格 `<skin>_dir.preview.png`，方便检查透明边缘。
+
+起手方向由 `p.face` 决定（移动时更新，出招时转向目标），所以角色转身、出手都会朝正确的方向。
+
 ## 本地打开时的注意
 
 直接双击 `index.html`（`file://`）时，大多数浏览器允许 `<img>` 加载同目录图片；如果遇到图片不显示：

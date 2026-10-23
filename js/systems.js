@@ -190,6 +190,11 @@ const SKILL_BEHAVIORS = {
             p.y + Math.sin(base) * range * 0.55, range * 0.55, fx, def.color, {
               heavy: true, life: 0.32
             });
+          // 重击落点: 小范围裂地 + 碎石, 让「砸下去」有重量
+          VFX.slam(p.x + Math.cos(base) * range * 0.68,
+            p.y + Math.sin(base) * range * 0.68, range * 0.52, fx, def.color,
+            { debris: 10, crackLife: 0.85 });
+          g.freeze(0.055);
         }
         if (w.id === 'rend') {
           // 撕裂: 三道错开的血爪
@@ -201,7 +206,7 @@ const SKILL_BEHAVIORS = {
       }
       if (w.id !== 'dragon_breath') {
         g.cam.shake = Math.min(14, g.cam.shake + (heavy ? 3.2 : 0.6));
-        Sfx.play('shoot');
+        Sfx.play(heavy ? 'heavy' : 'slash');
       }
 
       const near = [];
@@ -290,23 +295,44 @@ const SKILL_BEHAVIORS = {
       p.triggerAttack(spin ? 'spin' : (fx === 'ice' ? 'cast' : 'slam'), null, w.id, {
         style: fx, dur: spin ? 0.42 : 0.4
       });
-      VFX.burst(p.x, p.y, radius, fx, def.color, {
-        heavy: radius >= 150 || w.id === 'thunder_clap',
-        life: w.id === 'thunder_clap' ? 0.62 : 0.52
-      });
+      if (w.id === 'arcane_explosion') {
+        // 奥爆: 力场炸裂, 有自己的形态, 不用通用爆发
+        VFX.pulse(p.x, p.y, radius * 1.08, 'arcane', def.color, {
+          life: 0.66, heavy: radius >= 150
+        });
+      } else {
+        VFX.burst(p.x, p.y, radius, fx, def.color, {
+          heavy: radius >= 150 || w.id === 'thunder_clap',
+          life: w.id === 'thunder_clap' ? 0.62 : 0.52
+        });
+      }
       VFX.shock(p.x, p.y, radius * 0.9, fx, def.color, { heavy: radius >= 150 });
+      if (spin) {
+        // 旋风斩: 真旋转姿态 + 龙卷风演出
+        VFX.spin(p.x, p.y, radius * 1.12, fx, def.color, {
+          life: w.id === 'bladestorm' ? 0.62 : 0.52,
+          heavy: w.id === 'bladestorm'
+        });
+        VFX.dust(p.x, p.y, fx, def.color, { life: 0.5 });
+      }
       if (w.id === 'thunder_clap') {
+        // 踩地板: 裂地贴花 + 碎石 + 冲击环
+        VFX.slam(p.x, p.y, radius * 1.05, 'thunder', def.color, { debris: 18 });
         for (let i = 0; i < 5; i++) {
           const a = i * TAU / 5 + rnd(0.4);
           VFX.lightning(p.x, p.y, p.x + Math.cos(a) * radius, p.y + Math.sin(a) * radius,
             'thunder', def.color, { life: 0.22 });
         }
+        g.cam.shake = Math.min(22, g.cam.shake + 6);
+        g.freeze(0.07);
       }
       if (w.id === 'frost_nova') {
         VFX.cast(p.x, p.y, radius * 0.8, 'ice', def.color, { life: 0.55 });
       }
       g.cam.shake = Math.min(16, g.cam.shake + (radius >= 150 ? 3 : 1));
-      Sfx.play('shoot');
+      if (spin) Sfx.play('whirl');
+      else if (w.id === 'thunder_clap') Sfx.play('quake');
+      else Sfx.play('shoot');
       for (let i = 0; i < valid.length; i++) hitEnemy(g, w, s, valid[i]);
     }
   },
@@ -719,15 +745,17 @@ class Spawner {
     this.spawnT -= dt;
     if (this.spawnT <= 0) {
       this.spawnT = wave.interval * (g.mods.spawnMul || 1);
-      for (let i = 0; i < wave.batch; i++) {
-        if (g.enemies.length >= CONTENT.maxEnemies) break;
+      // 硬核的 batchBonus: 越到后面每波多塞几只, 形成「满屏」
+      const bonus = (g.mods.batchBonus && this.t > 150) ? g.mods.batchBonus : 0;
+      for (let i = 0; i < wave.batch + bonus; i++) {
+        if (g.enemies.length >= (g.mods.maxEnemies || CONTENT.maxEnemies)) break;
         g.spawnAround(pick(wave.types), false);
       }
     }
 
     this.eliteT -= dt;
     if (this.eliteT <= 0) {
-      this.eliteT = CONTENT.eliteEvery;
+      this.eliteT = g.mods.eliteEvery || CONTENT.eliteEvery;
       const types = wave.types.slice(0, Math.min(3, wave.types.length));
       const type = pick(types);
       g.spawnAround(type, true);
@@ -750,7 +778,7 @@ function makeOffer(p, cand) {
     const d = CONTENT.skills[cand.id];
     return {
       kind: 'skill', id: cand.id, title: d.name, icon: d.icon,
-      color: d.color, tag: '新技能', desc: d.desc
+      color: d.color, tag: '新技能', desc: d.desc, from: 0, to: 1
     };
   }
   if (cand.kind === 'up') {
@@ -758,14 +786,14 @@ function makeOffer(p, cand) {
     const d = CONTENT.skills[cand.id];
     return {
       kind: 'up', id: cand.id, title: d.name, icon: d.icon, color: d.color,
-      tag: 'Lv ' + (w.lvl + 1), desc: d.up[w.lvl - 1]
+      tag: '技能升级', desc: d.up[w.lvl - 1], from: w.lvl, to: w.lvl + 1
     };
   }
   const lv = p.passiveLevel(cand.id);
   const d = CONTENT.passives[cand.id];
   return {
     kind: 'passive', id: cand.id, title: d.name, icon: d.icon,
-    color: '#ffd166', tag: 'Lv ' + (lv + 1), desc: d.desc
+    color: '#ffd166', tag: '被动强化', desc: d.desc, from: lv, to: lv + 1
   };
 }
 

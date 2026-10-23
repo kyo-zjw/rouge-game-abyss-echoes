@@ -77,10 +77,13 @@ CONTENT.skillFx = {
 
 | 接口 | 用途 |
 |---|---|
-| `VFX.slash(x,y,angle,r,arc,style,color,opt)` | 近战扇形残影、重击火花 |
+| `VFX.slash(x,y,angle,r,arc,style,color,opt)` | 近战刀光：拖影扇面 + 月牙刃身 + 残影 + 刃口高光 + 重击火花 |
 | `VFX.cone(x,y,angle,r,arc,style,color,opt)` | 冰锥 / 通用锥形喷吐 |
-| `VFX.breath(x,y,angle,r,arc,style,color,opt)` | 龙息专用：地面焦痕 + 锯齿火锥 / 火舌 / 余烬 / 烟 / 热浪，一次 push 两层 |
-| `VFX.burst(x,y,r,style,color,opt)` | 爆炸、寒冰新星、奥术爆裂、Boss 死亡 |
+| `VFX.breath(x,y,angle,r,arc,style,color,opt)` | 龙息专用：地面焦痕 + 锯齿火锥 / 火舌 / 余烬 / 烟 / 热浪 / **龙头**，一次 push 两层 |
+| `VFX.burst(x,y,r,style,color,opt)` | 爆炸、寒冰新星（额外冰刺）、奥术爆裂、Boss 死亡 |
+| `VFX.pulse(x,y,r,style,color,opt)` | 奥爆：能量力场 —— 球体膨胀 + 六边形网格 + 符文环 + 外壳亮环 + 碎片 |
+| `VFX.slam(x,y,r,style,color,opt)` | 裂地：地面裂纹（带分叉）+ 碎石 + 冲击环 + 尘土，踩地板 / 重击落点 |
+| `VFX.spin(x,y,r,style,color,opt)` | 旋风：地面风环 + 三段螺旋气流 + 环绕刀光 + 内吸碎屑 |
 | `VFX.shock(x,y,r,style,color,opt)` | 地面冲击环 |
 | `VFX.cast(x,y,r,style,color,opt)` | 施法/预警法阵 |
 | `VFX.aura(x,y,r,style,color,opt)` | 增益光柱 |
@@ -90,6 +93,19 @@ CONTENT.skillFx = {
 | `VFX.drawProjectile(ctx, pr)` | 飞行弹体（火球、冰箭、奥术飞弹、龙息弹、敌方暗影弹） |
 | `VFX.drawZone(ctx, z)` | 地面区域（暴风雪、烈焰风暴、毒云、陨石） |
 | `VFX.drawPlayerCast(ctx, p, g)` | 玩家施法/引导的持续演出 |
+
+**打击感**（战士向）：
+
+- **命中定格**：`GAME.freeze(sec)` 让整个世界（含特效）冻结 55~70ms，只留震屏衰减；同一时刻只触发一次，0.45s 冷却，避免连击变成幻灯片。
+- **刀光**：`_slash` 不再是单条圆弧 —— 拖影扇面（越靠刃口越亮）→ 月牙刃身（内缘 0.58r、外缘 1.02r、尖端收锋）→ 两层残影 → 尖端闪光 → 重击 9 根火花射线。
+- **裂地**：`_crack` 画 9 条带分叉的放射裂纹（暗缝 + 发光边），`_debris` 用解析式抛物线甩出 10~22 块碎石，中心还有一次塌陷渐变。
+- **旋风**：2D 里用「横向压扁 + 翻转」模拟原地转身（`animPose` 的 `spin` 分支），配合 `_whirl` 的三段螺旋气流、双圈刀光、由外向内收的碎屑；剑刃风暴的引导演出复用同一套形状语言。
+- **音效分层**：`slash`（破空 + 刃啸 + 金属泛音）、`heavy`（低频闷响 + 金属）、`quake`（裂地）、`whirl`（风啸）。
+
+**龙息龙首**（`_dragonHead`）：不是「身后一只写实龙在喷火」，而是火焰本身在锥体前段（约 0.62r 处、头长 ≈ 0.38r）聚成一只 **Q 版龙头** —— 圆脑袋、短吻、两颗大亮眼、三簇向后舔的火舌角、张开的下颚，嘴里再甩出三股短火舌。整个头只用火焰调色板 + `lighter` 叠加绘制，没有实体材质和暗部，因此看起来就是锥体里烧出来的一张脸，而不是贴在火上的贴图；头往前领着整条火舌走，正好落在伤害锥形里。张嘴进度按时间推进（0.05s 开始、0.25s 全开）。
+
+**奥爆力场**（`_pulse`）：开爆白光 → 球体膨胀（边缘亮、中间压暗形成中空）→ 三层反向旋转的六边形网格 → 三道错相冲击环 → 18 个符文刻度 → 16 片旋转玻璃碎片 → 白色外壳亮环。
+
 
 **龙息分层**（`_breath` / `_breathGround`）：
 

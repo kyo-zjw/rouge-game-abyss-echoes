@@ -96,9 +96,16 @@ function vfxSoft(ctx, x, y, rx, ry, color, a) {
 const VFX = {
   items: [],
   maxItems: 190,
+  // 特效密度系数: ?lowfx=1 时降到 0.5, 密集战斗/低配机用
+  quality: 1,
 
   reset() {
     this.items.length = 0;
+  },
+
+  /* 按质量系数裁剪粒子数, 至少保留 2 个 */
+  count(n) {
+    return Math.max(2, Math.round(n * this.quality));
   },
 
   push(o) {
@@ -223,6 +230,45 @@ const VFX = {
     });
   },
 
+  /* 裂地: 地面裂纹 + 碎石 + 冲击环 + 尘土, 用于踩地板类重击 */
+  slam(x, y, r, style, color, opt) {
+    opt = opt || {};
+    const st = style || 'gold';
+    const c = color || vfxPal(st)[1];
+    const seed = opt.seed === undefined ? Math.random() * 100 : opt.seed;
+    this.push({
+      type: 'crack', x, y, r: r || 90, style: st, color: c, seed,
+      life: opt.crackLife || 1.15, layer: 'ground'
+    });
+    this.push({
+      type: 'debris', x, y, r: r || 90, style: st, color: c, seed: seed + 7,
+      n: this.count(opt.debris || 16), life: 0.62, layer: 'over'
+    });
+    this.shock(x, y, (r || 90) * 1.05, st, c, { heavy: true, life: 0.45 });
+    this.dust(x, y, st, c, { life: 0.55 });
+    return this.items[this.items.length - 1];
+  },
+
+  /* 奥爆: 能量力场炸裂(球体 + 六边形网格 + 符文环 + 碎片) */
+  pulse(x, y, r, style, color, opt) {
+    opt = opt || {};
+    return this.push({
+      type: 'pulse', x, y, r: r || 90,
+      style: style || 'arcane', color: color || vfxPal(style)[1],
+      life: opt.life || 0.62, heavy: !!opt.heavy, layer: 'over'
+    });
+  },
+
+  /* 旋风: 地面风环 + 螺旋气流 + 环绕刀光 + 内吸碎屑 */
+  spin(x, y, r, style, color, opt) {
+    opt = opt || {};
+    return this.push({
+      type: 'whirl', x, y, r: r || 110,
+      style: style || 'gold', color: color || vfxPal(style)[1],
+      life: opt.life || 0.55, heavy: !!opt.heavy, layer: 'over'
+    });
+  },
+
   /* ---------------- 每帧绘制 ---------------- */
 
   draw(ctx, layer) {
@@ -243,66 +289,112 @@ const VFX = {
         case 'lightning': this._lightning(ctx, it); break;
         case 'impact': this._impact(ctx, it); break;
         case 'dust': this._dust(ctx, it); break;
+        case 'crack': this._crack(ctx, it); break;
+        case 'debris': this._debris(ctx, it); break;
+        case 'whirl': this._whirl(ctx, it); break;
+        case 'pulse': this._pulse(ctx, it); break;
       }
     }
     ctx.restore();
   },
 
+  /* 刀光: 拖影扇面 + 月牙刃身 + 残影 + 刃口高光 + 重击火花
+     旧版是一条圆弧描边, 看不出「刃」; 现在按挥砍进度扫出一道有厚度、有收锋的形状。 */
   _slash(ctx, it) {
     const k = clamp(it.t / it.life, 0, 1);
     const pal = vfxPal(it.style);
     const half = it.arc / 2;
-    const lead = -half + it.arc * vfxEase(Math.min(1, k * 1.35));
-    const span = Math.min(it.arc * 0.92, 1.55);
-    const start = Math.max(-half, lead - span);
+    const swing = vfxEase(Math.min(1, k * 1.45));
+    const lead = -half + it.arc * swing;
     const r = it.r;
-    const steps = 15;
+    const fade = 1 - k;
+    const heavy = !!it.heavy;
 
     ctx.save();
     ctx.translate(it.x, it.y);
     ctx.rotate(it.a);
-    ctx.lineCap = 'round';
     ctx.globalCompositeOperation = 'lighter';
 
-    // 扇形残影: 越靠近挥砍前沿越亮
+    // 1) 拖影扇面: 越靠近刃口越亮
+    const trailStart = Math.max(-half, lead - it.arc * 0.95);
+    const steps = 20;
     for (let i = 0; i < steps; i++) {
       const t0 = i / steps;
       const t1 = (i + 1) / steps;
-      const a0 = start + (lead - start) * t0;
-      const a1 = start + (lead - start) * t1 + 0.004;
-      const fade = Math.pow(t0, 1.45);
-      if (fade <= 0.001) continue;
-      const rr = r * (0.62 + 0.38 * fade);
-      ctx.globalAlpha = (1 - k) * 0.85 * fade;
-      ctx.strokeStyle = t0 > 0.66 ? pal[0] : (t0 > 0.3 ? pal[1] : pal[2]);
-      ctx.lineWidth = (it.heavy ? r * 0.22 : r * 0.16) * (0.35 + fade);
+      const a0 = trailStart + (lead - trailStart) * t0;
+      const a1 = trailStart + (lead - trailStart) * t1 + 0.006;
+      const g = Math.pow(t0, 1.7);
+      if (g < 0.03) continue;
+      const rr = r * (0.55 + 0.42 * g);
+      ctx.globalAlpha = fade * 0.5 * g;
+      ctx.strokeStyle = t0 > 0.72 ? pal[0] : (t0 > 0.34 ? pal[1] : pal[2]);
+      ctx.lineWidth = r * (heavy ? 0.30 : 0.23) * (0.25 + 0.75 * g);
       ctx.beginPath();
       ctx.arc(0, 0, rr, a0, a1);
       ctx.stroke();
     }
 
-    // 高亮刃口
-    if (k < 0.9) {
-      ctx.globalAlpha = (1 - k) * 0.95;
-      ctx.strokeStyle = pal[0];
-      ctx.lineWidth = (it.heavy ? 5 : 3) * (1 - k) + 1;
+    // 2) 刃身: 内缘在 0.58r, 外缘 1.02r, 尖端收在挥砍前沿
+    const bladeArc = Math.min(1.25, Math.max(0.55, it.arc * 0.8));
+    const b0 = Math.max(-half - 0.12, lead - bladeArc);
+    const tipR = r * 1.06;
+    ctx.globalAlpha = fade * 0.92;
+    const bg = ctx.createLinearGradient(
+      Math.cos(b0) * r * 0.8, Math.sin(b0) * r * 0.8,
+      Math.cos(lead) * tipR, Math.sin(lead) * tipR);
+    bg.addColorStop(0, vfxRgba(pal[2], 0));
+    bg.addColorStop(0.35, vfxRgba(pal[1], 0.55));
+    bg.addColorStop(0.8, vfxRgba(pal[0], 0.85));
+    bg.addColorStop(1, vfxRgba(pal[0], 0.95));
+    ctx.fillStyle = bg;
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 1.02, b0, lead);
+    ctx.lineTo(Math.cos(lead) * tipR, Math.sin(lead) * tipR);
+    ctx.arc(0, 0, r * 0.58, lead, b0, true);
+    ctx.closePath();
+    ctx.fill();
+
+    // 刃口高光: 只画靠尖端的一段, 才有「破空」的感觉
+    ctx.globalAlpha = fade * 0.95;
+    ctx.strokeStyle = pal[0];
+    ctx.lineWidth = heavy ? 3.4 : 2.2;
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 1.01, b0 + bladeArc * 0.3, lead);
+    ctx.stroke();
+
+    // 3) 残影: 前一帧的刃位, 制造速度感
+    for (let g = 1; g <= 2; g++) {
+      const gl = lead - g * 0.17;
+      if (gl < -half - 0.2) break;
+      ctx.globalAlpha = fade * (0.28 - g * 0.09);
+      ctx.strokeStyle = pal[1];
+      ctx.lineWidth = (heavy ? 9 : 6) - g * 2;
       ctx.beginPath();
-      ctx.arc(0, 0, r * 0.92, lead - 0.09, lead + 0.03);
+      ctx.arc(0, 0, r * 0.84, gl - 0.55, gl);
       ctx.stroke();
     }
 
-    // 挥砍火花
-    if (it.heavy) {
-      ctx.globalAlpha = (1 - k) * 0.8;
-      ctx.strokeStyle = pal[1];
-      ctx.lineWidth = 2;
-      for (let i = 0; i < 7; i++) {
-        const a = lead + (vfxHash(i + it.seed) - 0.5) * it.arc * 0.7;
-        const r0 = r * (0.55 + vfxHash(i + 3 + it.seed) * 0.35);
-        const r1 = r0 + 16 + vfxHash(i + 9 + it.seed) * 24;
+    // 4) 尖端命中闪光
+    if (k < 0.55) {
+      const tipA = k < 0.2 ? k / 0.2 : (1 - (k - 0.2) / 0.35);
+      vfxGlow(ctx, Math.cos(lead) * tipR, Math.sin(lead) * tipR,
+        r * (heavy ? 0.34 : 0.24) * (0.6 + 0.4 * tipA),
+        pal[0], Math.max(0, fade * tipA * 0.85));
+    }
+
+    // 5) 重击火花: 沿刃口飞出的短射线
+    if (heavy) {
+      const n = 9;
+      for (let i = 0; i < n; i++) {
+        const a = lead + (vfxHash(i + it.seed) - 0.5) * 0.9;
+        const r0 = r * (0.62 + vfxHash(i + 3 + it.seed) * 0.3);
+        const len = (14 + vfxHash(i + 9 + it.seed) * 30) * (0.4 + fade);
+        ctx.globalAlpha = fade * (0.45 + 0.5 * vfxHash(i + 13 + it.seed));
+        ctx.strokeStyle = i % 3 === 0 ? pal[0] : pal[1];
+        ctx.lineWidth = 1.4 + vfxHash(i + 5 + it.seed) * 1.6;
         ctx.beginPath();
         ctx.moveTo(Math.cos(a) * r0, Math.sin(a) * r0);
-        ctx.lineTo(Math.cos(a) * r1, Math.sin(a) * r1);
+        ctx.lineTo(Math.cos(a) * (r0 + len), Math.sin(a) * (r0 + len));
         ctx.stroke();
       }
     }
@@ -534,6 +626,9 @@ const VFX = {
     ctx.closePath();
     ctx.fill();
 
+    // 龙头: 张开下颚, 火焰从嘴里喷出
+    this._dragonHead(ctx, it, r, pal, fade);
+
     // 前沿火环 + 热浪
     ctx.globalAlpha = fade * 0.55;
     ctx.strokeStyle = pal[0];
@@ -653,6 +748,65 @@ const VFX = {
       ctx.restore();
     }
 
+    // 冰系: 边缘炸出的冰刺, 让冰爆有明确的「冰」形态
+    if (style === 'ice') {
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * TAU + it.seed;
+        const d = r * (0.32 + 0.55 * e);
+        const spike = r * 0.17 * (0.7 + 0.5 * vfxHash(i + it.seed));
+        ctx.save();
+        ctx.translate(Math.cos(a) * d, Math.sin(a) * d * 0.9);
+        ctx.rotate(a + Math.PI / 2);
+        ctx.globalAlpha = (1 - k) * 0.75;
+        ctx.fillStyle = vfxRgba(i % 2 ? pal[0] : pal[1], 0.9);
+        ctx.beginPath();
+        ctx.moveTo(0, -spike);
+        ctx.lineTo(spike * 0.34, spike * 0.34);
+        ctx.lineTo(-spike * 0.34, spike * 0.34);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+
+    // 火焰: 向外甩出的火舌(水滴形), 和冰刺/符文形成三种不同的形状语言
+    if (style === 'fire' || style === 'pyro' || style === 'dragon') {
+      const n = this.count(10);
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * TAU + it.seed * 1.3;
+        const d = r * (0.18 + 0.62 * e) * (0.8 + 0.4 * vfxHash(i + 5 + it.seed));
+        const len = r * 0.26 * (0.6 + 0.6 * vfxHash(i + 9 + it.seed)) * (1 - k * 0.4);
+        ctx.save();
+        ctx.translate(Math.cos(a) * d, Math.sin(a) * d - it.t * r * 0.2);
+        ctx.rotate(a + Math.PI / 2);
+        ctx.globalAlpha = (1 - k) * 0.7;
+        ctx.fillStyle = vfxRgba(i % 2 ? pal[0] : pal[1], 0.9);
+        ctx.beginPath();
+        ctx.moveTo(0, -len);
+        ctx.quadraticCurveTo(len * 0.45, -len * 0.15, 0, len * 0.5);
+        ctx.quadraticCurveTo(-len * 0.45, -len * 0.15, 0, -len);
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+
+    // 奥术: 一圈往外推的符文刻度, 让「能量力场」有形状而不是只有一团光
+    if (style === 'arcane' || style === 'void') {
+      const n = this.count(14);
+      ctx.globalAlpha = (1 - k) * 0.8;
+      ctx.strokeStyle = pal[0];
+      ctx.lineWidth = 2;
+      for (let i = 0; i < n; i++) {
+        const a = i * TAU / n + it.seed + it.t * 0.8;
+        const rr = r * (0.42 + 0.5 * e);
+        const len = r * 0.07 * (0.7 + 0.6 * vfxHash(i + it.seed));
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(a) * rr, Math.sin(a) * rr);
+        ctx.lineTo(Math.cos(a) * (rr + len), Math.sin(a) * (rr + len));
+        ctx.stroke();
+      }
+    }
+
     // 火焰/龙息的上升烟团
     if (style === 'fire' || style === 'pyro' || style === 'dragon') {
       ctx.globalCompositeOperation = 'source-over';
@@ -669,6 +823,258 @@ const VFX = {
         ctx.fill();
       }
     }
+    ctx.restore();
+  },
+
+  /* 龙头: 不是「身后一只写实龙在喷火」, 而是火焰本身在锥体前段聚成一只 Q 版龙头。
+     全部用 fire 调色板 + lighter 叠加绘制, 没有实体材质, 和锥体是同一团火。 */
+  _dragonHead(ctx, it, r, pal, fade) {
+    const s = r * 0.38;                        // 头的大小(偏大, Q 版比例)
+    const cx = r * 0.62;                       // 位置: 锥体前段, 火头领着整条火舌往前走
+    const appear = clamp(it.t / 0.10, 0, 1);
+    const open = clamp((it.t - 0.05) / 0.20, 0, 1);  // 张口
+    const alpha = fade * appear;
+    if (s < 5 || alpha <= 0.01) return;
+
+    ctx.save();
+    ctx.translate(cx, 0);
+    ctx.globalCompositeOperation = 'lighter';
+
+    // 头部的整体光团, 让头「长在火里」而不是贴在上面
+    ctx.globalAlpha = 1;
+    vfxGlow(ctx, 0, 0, s * 1.25, pal[1], 0.45 * alpha);
+
+    // 头骨: 圆润的水滴形火焰块(Q 版大脑袋 + 短吻)
+    const skull = ctx.createRadialGradient(-s * 0.10, -s * 0.24, s * 0.06, 0, 0, s * 1.05);
+    skull.addColorStop(0, vfxRgba('#fff8dd', 0.95 * alpha));
+    skull.addColorStop(0.32, vfxRgba(pal[0], 0.88 * alpha));
+    skull.addColorStop(0.70, vfxRgba(pal[1], 0.62 * alpha));
+    skull.addColorStop(1, vfxRgba(pal[2], 0));
+    ctx.fillStyle = skull;
+    ctx.beginPath();
+    ctx.moveTo(-s * 0.92, s * 0.08);
+    ctx.bezierCurveTo(-s * 0.96, -s * 0.60, -s * 0.34, -s * 0.94, s * 0.12, -s * 0.78);
+    ctx.bezierCurveTo(s * 0.60, -s * 0.64, s * 0.94, -s * 0.30, s * 0.90, -s * 0.04);
+    ctx.lineTo(s * 0.28, s * 0.06);
+    ctx.bezierCurveTo(-s * 0.10, s * 0.18, -s * 0.64, s * 0.30, -s * 0.92, s * 0.08);
+    ctx.closePath();
+    ctx.fill();
+
+    // 下颚: 绕口角张开, 也是火焰(张开后火从缝里冲出去)
+    ctx.save();
+    ctx.translate(s * 0.28, s * 0.06);
+    ctx.rotate(open * 0.55);
+    ctx.translate(-s * 0.28, -s * 0.06);
+    const jaw = ctx.createLinearGradient(0, 0, s * 0.3, s * 0.5);
+    jaw.addColorStop(0, vfxRgba(pal[0], 0.85 * alpha));
+    jaw.addColorStop(0.55, vfxRgba(pal[1], 0.6 * alpha));
+    jaw.addColorStop(1, vfxRgba(pal[2], 0));
+    ctx.fillStyle = jaw;
+    ctx.beginPath();
+    ctx.moveTo(s * 0.86, s * 0.04);
+    ctx.bezierCurveTo(s * 0.68, s * 0.42, s * 0.06, s * 0.54, -s * 0.34, s * 0.34);
+    ctx.bezierCurveTo(-s * 0.08, s * 0.16, s * 0.44, s * 0.00, s * 0.86, s * 0.04);
+    ctx.closePath();
+    ctx.fill();
+    // 獠牙只留两颗小三角, 圆头圆脑的 Q 版不画排牙
+    ctx.fillStyle = vfxRgba('#fff3c4', 0.85 * alpha);
+    for (let i = 0; i < 2; i++) {
+      const tx = s * (0.52 + i * 0.20);
+      ctx.beginPath();
+      ctx.moveTo(tx, s * 0.02);
+      ctx.lineTo(tx + s * 0.09, s * 0.02);
+      ctx.lineTo(tx + s * 0.04, -s * 0.10);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.restore();
+
+    // 角/鬃: 三簇向后上方舔的火舌
+    for (let i = 0; i < 3; i++) {
+      const sway = Math.sin(it.t * 16 + i * 1.7 + it.seed) * 0.10;
+      const len = s * (0.85 + 0.25 * vfxHash(i + it.seed));
+      const a0 = -2.25 - i * 0.35 + sway;         // 朝后上方
+      const bx = -s * (0.34 + i * 0.16);
+      const by = -s * (0.46 + i * 0.10);
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = vfxRgba(i === 0 ? pal[0] : pal[1], 0.62 * alpha);
+      ctx.beginPath();
+      ctx.moveTo(bx, by);
+      ctx.quadraticCurveTo(
+        bx + Math.cos(a0) * len * 0.55 - s * 0.12, by + Math.sin(a0) * len * 0.55,
+        bx + Math.cos(a0 + 0.28) * len, by + Math.sin(a0 + 0.28) * len);
+      ctx.quadraticCurveTo(
+        bx + Math.cos(a0 + 0.10) * len * 0.5 + s * 0.14, by + Math.sin(a0) * len * 0.42,
+        bx, by);
+      ctx.fill();
+    }
+
+    // 眼睛: Q 版的大圆亮眼(两个), 加一点高光
+    for (let i = 0; i < 2; i++) {
+      const ex = s * (0.14 + i * 0.42);
+      const ey = -s * (0.36 - i * 0.04);
+      vfxGlow(ctx, ex, ey, s * 0.20, '#fff3c4', 0.55 * alpha);
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = vfxRgba('#fffbe8', 0.95 * alpha);
+      ctx.beginPath();
+      ctx.arc(ex, ey, s * 0.085, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = vfxRgba('#2a0f04', 0.9 * alpha);
+      ctx.beginPath();
+      ctx.arc(ex + s * 0.012, ey + s * 0.006, s * 0.040, 0, TAU);
+      ctx.fill();
+    }
+
+    // 喉咙/嘴里的核心光: 火焰从这里往外喷
+    ctx.globalAlpha = 1;
+    vfxGlow(ctx, s * 0.72, s * (0.02 + 0.06 * open), s * (0.30 + 0.10 * open), pal[0], 0.75 * alpha);
+    vfxGlow(ctx, s * 0.80, s * (0.02 + 0.05 * open), s * 0.16, '#fffbe8', 0.55 * alpha);
+
+    // 从嘴里冲出去的短火舌, 把「喷」这个动作做实
+    for (let i = 0; i < 3; i++) {
+      const a = (i - 1) * 0.20 + Math.sin(it.t * 24 + i * 2.4 + it.seed) * 0.05;
+      const len = s * (0.55 + 0.15 * Math.sin(it.t * 19 + i + it.seed));
+      const w = s * 0.13;
+      const mx = s * (0.86 + 0.06 * open);
+      ctx.fillStyle = vfxRgba(i === 1 ? '#fffbe8' : pal[0], 0.55 * alpha);
+      ctx.beginPath();
+      ctx.moveTo(mx, Math.sin(a) * w * 0.5);
+      ctx.quadraticCurveTo(mx + len * 0.55, Math.sin(a - 0.35) * w,
+        mx + len, Math.sin(a) * w * 0.25);
+      ctx.quadraticCurveTo(mx + len * 0.55, Math.sin(a + 0.35) * w,
+        mx, Math.sin(a) * w * 0.5);
+      ctx.fill();
+    }
+
+    // 头顶跳动的火苗, 让头始终在「烧」
+    for (let i = 0; i < 4; i++) {
+      const hx = -s * 0.55 + i * s * 0.30;
+      const hh = s * (0.30 + 0.16 * Math.sin(it.t * 21 + i * 2.2 + it.seed));
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = vfxRgba(i % 2 ? pal[0] : '#ffe9a8', 0.55 * alpha);
+      ctx.beginPath();
+      ctx.moveTo(hx - s * 0.07, -s * 0.66);
+      ctx.quadraticCurveTo(hx, -s * 0.66 - hh, hx + s * 0.07, -s * 0.66);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    ctx.restore();
+  },
+
+  /* 奥爆: 能量力场炸裂 —— 球体膨胀 + 六边形网格 + 符文环 + 空腔 + 碎片 */
+  _pulse(ctx, it) {
+    const k = clamp(it.t / it.life, 0, 1);
+    const e = vfxEase(k);
+    const fade = 1 - k;
+    const pal = vfxPal(it.style);
+    const r = it.r;
+
+    ctx.save();
+    ctx.translate(it.x, it.y);
+    ctx.globalCompositeOperation = 'lighter';
+
+    // 1) 开爆白光: 极短
+    if (k < 0.14) {
+      const flash = 1 - k / 0.14;
+      vfxGlow(ctx, 0, 0, r * (0.35 + 0.5 * flash), '#ffffff', 0.7 * flash);
+    }
+
+    // 2) 球体: 边缘亮、中间透
+    const core = r * (0.18 + 1.0 * e);
+    const g = ctx.createRadialGradient(0, 0, core * 0.06, 0, 0, core);
+    g.addColorStop(0, vfxRgba('#ffffff', 0.42 * fade));
+    g.addColorStop(0.40, vfxRgba(pal[1], 0.26 * fade));
+    g.addColorStop(0.86, vfxRgba(pal[2], 0.30 * fade));
+    g.addColorStop(1, vfxRgba(pal[0], 0));
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(0, 0, core, 0, TAU);
+    ctx.fill();
+
+    // 3) 六边形力场: 三层, 反向旋转
+    ctx.lineWidth = 1.2;
+    for (let ring = 1; ring <= 3; ring++) {
+      const rr = core * (ring / 3.35);
+      const sides = 6 + ring * 6;
+      const dir = ring % 2 ? 1 : -1;
+      ctx.globalAlpha = fade * (0.42 - ring * 0.07);
+      ctx.strokeStyle = ring === 1 ? pal[0] : pal[1];
+      ctx.beginPath();
+      for (let i = 0; i <= sides; i++) {
+        const a = (i / sides) * TAU + it.seed + it.t * 1.3 * dir;
+        if (i === 0) ctx.moveTo(Math.cos(a) * rr, Math.sin(a) * rr);
+        else ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
+      }
+      ctx.stroke();
+    }
+
+    // 4) 外环: 三道错相的冲击波
+    for (let i = 0; i < 3; i++) {
+      const u = clamp(k * 1.15 - i * 0.12, 0, 1);
+      if (u <= 0) continue;
+      const rr = r * (0.25 + 0.95 * vfxEase(u));
+      ctx.globalAlpha = (1 - u) * 0.7;
+      ctx.strokeStyle = i === 0 ? pal[0] : pal[2];
+      ctx.lineWidth = (it.heavy ? 4 : 2.6) * (1 - u) + 0.7;
+      ctx.beginPath();
+      ctx.arc(0, 0, rr, 0, TAU);
+      ctx.stroke();
+    }
+
+    // 5) 符文刻度: 贴在球壳上的短划
+    const runes = this.count(18);
+    for (let i = 0; i < runes; i++) {
+      const a = (i / runes) * TAU - it.t * 0.9 + it.seed;
+      const rr = core * 0.92;
+      const len = core * (0.05 + 0.05 * vfxHash(i + it.seed));
+      ctx.globalAlpha = fade * (0.25 + 0.4 * vfxHash(i + 3 + it.seed));
+      ctx.strokeStyle = i % 3 === 0 ? '#ffffff' : pal[0];
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a) * rr, Math.sin(a) * rr);
+      ctx.lineTo(Math.cos(a) * (rr + len), Math.sin(a) * (rr + len));
+      ctx.stroke();
+    }
+
+    // 6) 玻璃碎片: 向外飞散并旋转
+    const parts = this.count(it.heavy ? 16 : 11);
+    for (let i = 0; i < parts; i++) {
+      const a = (i / parts) * TAU + it.seed + Math.sin(it.t * 5 + i) * 0.1;
+      const dist = r * (0.2 + 1.0 * e) * (0.6 + 0.5 * vfxHash(i + 7 + it.seed));
+      const size = r * (0.035 + 0.05 * vfxHash(i + 11 + it.seed)) * (1 - k * 0.3);
+      ctx.globalAlpha = fade * 0.85;
+      ctx.fillStyle = i % 3 === 0 ? pal[0] : pal[1];
+      ctx.save();
+      ctx.translate(Math.cos(a) * dist, Math.sin(a) * dist);
+      ctx.rotate(a + it.t * 7);
+      ctx.beginPath();
+      ctx.moveTo(size * 2.2, 0);
+      ctx.lineTo(-size * 0.5, -size);
+      ctx.lineTo(-size * 1.1, 0);
+      ctx.lineTo(-size * 0.5, size * 0.8);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // 7) 空腔: 内圈压暗 + 壳层亮环, 做出「力场是中空的」
+    const hollow = ctx.createRadialGradient(0, 0, 0, 0, 0, core * 0.55);
+    hollow.addColorStop(0, 'rgba(4,6,14,0.55)');
+    hollow.addColorStop(1, 'rgba(4,6,14,0)');
+    ctx.globalAlpha = fade;
+    ctx.fillStyle = hollow;
+    ctx.beginPath();
+    ctx.arc(0, 0, core * 0.55, 0, TAU);
+    ctx.fill();
+
+    ctx.globalAlpha = fade * 0.8;
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.arc(0, 0, core * 0.66, 0, TAU);
+    ctx.stroke();
+
     ctx.restore();
   },
 
@@ -887,6 +1293,154 @@ const VFX = {
     ctx.restore();
   },
 
+  /* 裂地贴花: 中心塌陷 + 放射裂纹(带分叉), 随寿命淡出 */
+  _crack(ctx, it) {
+    const k = clamp(it.t / it.life, 0, 1);
+    const fade = k < 0.10 ? k / 0.10 : (1 - (k - 0.10) / 0.90);
+    const pal = vfxPal(it.style);
+    const grow = 0.35 + 0.65 * vfxEase(Math.min(1, k * 2.6));
+    const r = it.r * grow;
+
+    ctx.save();
+    ctx.translate(it.x, it.y);
+
+    // 中心塌陷
+    const g = ctx.createRadialGradient(0, 0, 0, 0, 0, r * 0.72);
+    g.addColorStop(0, 'rgba(5,3,2,' + (0.6 * fade).toFixed(3) + ')');
+    g.addColorStop(0.65, 'rgba(8,5,3,' + (0.3 * fade).toFixed(3) + ')');
+    g.addColorStop(1, 'rgba(8,5,3,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 0.72, 0, TAU);
+    ctx.fill();
+
+    const mains = 9;
+    for (let i = 0; i < mains; i++) {
+      const a = (i / mains) * TAU + (vfxHash(i + it.seed) - 0.5) * 0.22;
+      const len = r * (0.5 + 0.5 * vfxHash(i + 3 + it.seed));
+      const segs = 5;
+      const xs = [0], ys = [0];
+      for (let j = 1; j <= segs; j++) {
+        const u = j / segs;
+        const aa = a + (vfxHash(i * 7 + j + it.seed) - 0.5) * 0.16;
+        xs.push(Math.cos(aa) * len * u);
+        ys.push(Math.sin(aa) * len * u);
+      }
+      // 暗缝
+      ctx.globalAlpha = fade * 0.9;
+      ctx.strokeStyle = 'rgba(0,0,0,0.85)';
+      ctx.lineWidth = 3.4 * (1 - grow * 0.25);
+      ctx.beginPath();
+      ctx.moveTo(xs[0], ys[0]);
+      for (let j = 1; j < xs.length; j++) ctx.lineTo(xs[j], ys[j]);
+      ctx.stroke();
+      // 发光边
+      ctx.globalAlpha = fade * 0.55;
+      ctx.strokeStyle = i % 3 === 0 ? pal[0] : pal[2];
+      ctx.lineWidth = 1.3;
+      ctx.stroke();
+      // 分叉
+      const bi = 2 + (i % 3);
+      const ba = a + (i % 2 ? 1 : -1) * (0.5 + vfxHash(i + 11 + it.seed) * 0.4);
+      ctx.globalAlpha = fade * 0.5;
+      ctx.beginPath();
+      ctx.moveTo(xs[bi], ys[bi]);
+      ctx.lineTo(xs[bi] + Math.cos(ba) * len * 0.32, ys[bi] + Math.sin(ba) * len * 0.32);
+      ctx.stroke();
+    }
+    ctx.restore();
+  },
+
+  /* 碎石: 解析式抛物线, 不保存粒子状态 */
+  _debris(ctx, it) {
+    const k = clamp(it.t / it.life, 0, 1);
+    const fade = 1 - k;
+    const pal = vfxPal(it.style);
+    ctx.save();
+    for (let i = 0; i < it.n; i++) {
+      const a = vfxHash(i + it.seed) * TAU;
+      const spd = it.r * (0.9 + 1.8 * vfxHash(i + 3 + it.seed));
+      const t = it.t;
+      const px = it.x + Math.cos(a) * spd * t;
+      const py = it.y + Math.sin(a) * spd * t * 0.6 + 300 * t * t;
+      const sz = it.r * (0.025 + 0.055 * vfxHash(i + 7 + it.seed)) * (1 - k * 0.35);
+      if (sz <= 0.4) continue;
+      ctx.globalAlpha = fade * 0.95;
+      ctx.fillStyle = i % 5 === 0 ? pal[1] : '#2b2119';
+      const rot = a + t * 6 * (i % 2 ? 1 : -1);
+      ctx.beginPath();
+      ctx.moveTo(px + Math.cos(rot) * sz, py + Math.sin(rot) * sz);
+      ctx.lineTo(px + Math.cos(rot + 2.4) * sz, py + Math.sin(rot + 2.4) * sz);
+      ctx.lineTo(px + Math.cos(rot + 4.2) * sz * 1.1, py + Math.sin(rot + 4.2) * sz * 1.1);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.restore();
+  },
+
+  /* 旋风: 地面风环 + 螺旋气流 + 环绕刀光 + 内吸碎屑 */
+  _whirl(ctx, it) {
+    const k = clamp(it.t / it.life, 0, 1);
+    const fade = k < 0.15 ? k / 0.15 : (1 - (k - 0.15) / 0.85);
+    const pal = vfxPal(it.style);
+    const r = it.r * (0.75 + 0.25 * vfxEase(k));
+    const spin = it.t * 16 + it.seed;
+
+    ctx.save();
+    ctx.translate(it.x, it.y);
+    ctx.globalCompositeOperation = 'lighter';
+
+    // 地面风环
+    ctx.globalAlpha = fade * 0.5;
+    ctx.strokeStyle = pal[1];
+    ctx.lineWidth = 2.4;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, r * 1.05, r * 0.42, 0, 0, TAU);
+    ctx.stroke();
+
+    // 螺旋气流
+    for (let arm = 0; arm < 3; arm++) {
+      ctx.globalAlpha = fade * (0.5 - arm * 0.1);
+      ctx.strokeStyle = arm === 0 ? pal[0] : pal[1];
+      ctx.lineWidth = 3.2 - arm * 0.6;
+      ctx.beginPath();
+      for (let j = 0; j <= 14; j++) {
+        const u = j / 14;
+        const a = spin + arm * (TAU / 3) + u * 2.4;
+        const rr = r * (0.35 + 0.7 * u);
+        const x = Math.cos(a) * rr;
+        const y = Math.sin(a) * rr * 0.42 - u * r * 0.85;
+        if (j === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+
+    // 环绕刀光
+    ctx.globalAlpha = fade * 0.7;
+    ctx.strokeStyle = pal[0];
+    ctx.lineWidth = 2.6;
+    for (let b = 0; b < 2; b++) {
+      const a0 = spin * 0.9 + b * Math.PI;
+      ctx.beginPath();
+      ctx.ellipse(0, -r * 0.18, r * 0.85, r * 0.36, 0, a0, a0 + 1.5);
+      ctx.stroke();
+    }
+
+    // 内吸碎屑
+    for (let i = 0; i < this.count(12); i++) {
+      const ph = (k + i / 12) % 1;
+      const a = spin * 1.4 + i * (TAU / 12);
+      const rr = r * (1.05 - ph * 0.85);
+      ctx.globalAlpha = fade * 0.55 * (1 - ph);
+      ctx.fillStyle = i % 3 === 0 ? pal[0] : pal[1];
+      ctx.beginPath();
+      ctx.arc(Math.cos(a) * rr, Math.sin(a) * rr * 0.5 - ph * r * 0.5, 1.8, 0, TAU);
+      ctx.fill();
+    }
+    ctx.restore();
+  },
+
   _dust(ctx, it) {
     const k = clamp(it.t / it.life, 0, 1);
     const e = vfxEase(k);
@@ -966,35 +1520,69 @@ const VFX = {
     }
 
     if (ch) {
-      // 剑刃风暴: 环绕玩家的旋转刀光
+      // 剑刃风暴: 龙卷风 + 环绕刀光 + 内吸碎屑
       const radius = (ch.radius || p.r * 2.4);
       const spin = time * 9 + p.walk;
-      ctx.globalAlpha = 0.55;
+
+      // 地面风环
+      ctx.globalAlpha = 0.35 + 0.1 * Math.sin(time * 8);
       ctx.strokeStyle = pal[1];
-      ctx.lineWidth = 3;
+      ctx.lineWidth = 2.4;
+      ctx.beginPath();
+      ctx.ellipse(p.x, p.y, radius * 1.02, radius * 0.42, 0, 0, TAU);
+      ctx.stroke();
+
+      // 螺旋气流: 三股上升气流, 让旋风有"竖起来"的体积
+      for (let arm = 0; arm < 3; arm++) {
+        ctx.globalAlpha = 0.34 - arm * 0.07;
+        ctx.strokeStyle = arm === 0 ? pal[0] : pal[1];
+        ctx.lineWidth = 3 - arm * 0.5;
+        ctx.beginPath();
+        for (let j = 0; j <= 14; j++) {
+          const u = j / 14;
+          const a = spin + arm * (TAU / 3) + u * 2.2;
+          const rr = radius * (0.3 + 0.72 * u);
+          const x = p.x + Math.cos(a) * rr;
+          const y = p.y + Math.sin(a) * rr * 0.42 - u * radius * 0.8;
+          if (j === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+      }
+
+      // 环绕刀光: 每一道都是「外缘宽 + 内缘细」的双线
       for (let blade = 0; blade < 3; blade++) {
         const a0 = spin + blade * TAU / 3;
+        ctx.globalAlpha = 0.6;
+        ctx.strokeStyle = pal[1];
+        ctx.lineWidth = 3.4;
         ctx.beginPath();
-        ctx.arc(p.x, p.y, radius, a0, a0 + 0.9);
+        ctx.arc(p.x, p.y, radius, a0, a0 + 0.95);
         ctx.stroke();
-        ctx.globalAlpha = 0.25;
+        ctx.globalAlpha = 0.9;
+        ctx.strokeStyle = pal[0];
+        ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, radius * 1.02, a0 + 0.35, a0 + 0.95);
+        ctx.stroke();
+        ctx.globalAlpha = 0.3;
         ctx.strokeStyle = pal[0];
         ctx.lineWidth = 1.2;
         ctx.beginPath();
         ctx.arc(p.x, p.y, radius * 0.72, a0 + 0.2, a0 + 1.1);
         ctx.stroke();
-        ctx.globalAlpha = 0.5;
-        ctx.strokeStyle = pal[1];
-        ctx.lineWidth = 2.5;
       }
-      // 旋涡粒子
-      ctx.fillStyle = vfxRgba(pal[0], 0.8);
-      for (let i = 0; i < 10; i++) {
-        const a = spin * 1.4 + i * TAU / 10;
-        const rr = radius * (0.35 + 0.6 * vfxHash(i + 4));
-        ctx.globalAlpha = 0.25 + 0.35 * vfxHash(i + 9);
+
+      // 内吸碎屑: 从外圈螺旋收向脚底
+      for (let i = 0; i < 14; i++) {
+        const ph = (time * 0.6 + i / 14) % 1;
+        const a = spin * 1.4 + i * (TAU / 14);
+        const rr = radius * (1.05 - ph * 0.9);
+        ctx.globalAlpha = 0.5 * (1 - ph);
+        ctx.fillStyle = i % 3 === 0 ? pal[0] : pal[1];
         ctx.beginPath();
-        ctx.arc(p.x + Math.cos(a) * rr, p.y + Math.sin(a) * rr, 2, 0, TAU);
+        ctx.arc(p.x + Math.cos(a) * rr,
+          p.y + Math.sin(a) * rr * 0.5 - ph * radius * 0.55, 1.8, 0, TAU);
         ctx.fill();
       }
     }

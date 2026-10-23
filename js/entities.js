@@ -495,8 +495,14 @@ class Player {
       } else if (a.kind === 'buff') {
         sy += 0.05 * Math.sin(u * Math.PI);
       } else if (a.kind === 'spin') {
-        rot += u * 0.35;
-        lift += Math.sin(u * Math.PI) * 2;
+        // 2D 里用「横向压扁 + 翻转」模拟原地转身, 比直接转贴图更像人在旋身;
+        // 旧的 0.35rad 几乎看不出在转, 旋风斩没有「不停旋转」的观感。
+        const yaw = u * TAU * 1.5;
+        const c = Math.cos(yaw);
+        sx *= (c < 0 ? -1 : 1) * Math.max(0.16, Math.abs(c));
+        sy *= 1 - 0.07 * Math.abs(Math.sin(yaw));
+        rot += Math.sin(yaw) * 0.12;
+        lift += Math.sin(u * Math.PI) * 2.5;
       }
     }
 
@@ -605,6 +611,14 @@ class Enemy {
       this.summonType = d.summonType || '';
       this.mechEvery = d.mechEvery || 7;
       this.mechT = Math.min(4.5, this.mechEvery * 0.55);
+
+      // 狂暴: 打不动的 Boss 会越来越难缠(单目标 DPS 门槛), 而不是无限僵持
+      this.aliveT = 0;
+      this.enraged = false;
+      this.frenzied = false;
+      this.baseBurstEvery = this.burstEvery;
+      this.baseSummonEvery = this.summonEvery;
+      this.baseDmg = this.dmg;
     } else {
       d = CONTENT.enemies[type];
       if (!d) d = CONTENT.enemies.slime;
@@ -722,6 +736,33 @@ class Enemy {
         this.aimedT -= dt;
         this.summonT -= dt;
         this.mechT -= dt;
+
+        // 4~5 阶 Boss 的狂暴: 55s(5 阶) / 65s(4 阶) 后回血 + 弹幕加密,
+        // 30s 后伤害提高 —— 把「拖到死」变成「必须在这之前打掉」的 DPS 检验。
+        if (this.tier >= 4) {
+          this.aliveT += dt;
+          const lim = (this.tier >= 5 ? 70 : 85) * ((g.mods && g.mods.enrageMul) || 1);
+          this.enrageLim = lim;
+          if (!this.enraged && this.aliveT > lim) {
+            this.enraged = true;
+            g.announce(this.name + ' · 狂暴');
+            FX.ring(this.x, this.y, this.r + 44, '#ff6b8b', 0.9);
+            VFX.slam(this.x, this.y, 170, 'blood', '#ff6b8b', { debris: 22 });
+            g.cam.shake = Math.min(28, g.cam.shake + 12);
+            Sfx.play('quake');
+          }
+          if (this.enraged) {
+            this.hp = Math.min(this.maxHp, this.hp + this.maxHp * 0.008 * dt);
+            this.burstEvery = Math.max(0.9, this.baseBurstEvery * 0.7);
+            this.summonEvery = Math.max(3.5, this.baseSummonEvery * 0.8);
+            if (!this.frenzied && this.aliveT > lim + 40) {
+              this.frenzied = true;
+              this.dmg = this.baseDmg * 1.25;
+              g.announce(this.name + ' · 深渊沸腾');
+              Sfx.play('boss');
+            }
+          }
+        }
 
         if (this.windup > 0) {
           // 特色机制前摇：站定蓄力，给玩家反应时间

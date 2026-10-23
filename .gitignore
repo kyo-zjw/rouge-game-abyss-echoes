@@ -11,6 +11,13 @@ tools/.backup/
 .env.local
 tools/seedream.user.json
 
+# Python bytecode
+__pycache__/
+*.pyc
+
+# local browser profile dumps (headless Edge temp dir)
+.edge-tmp/
+
 # OS / editor noise
 .DS_Store
 Thumbs.db
