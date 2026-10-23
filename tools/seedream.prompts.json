@@ -1,0 +1,844 @@
+{
+  "version": 1,
+  "style": "Original dark-fantasy roguelike game art, painterly semi-realistic stylization, abyssal underworld palette of indigo, violet and deep teal with magenta and cyan rim light, strong readable silhouette, high contrast, crisp shapes, no text, no watermark, no UI, no border, no copyrighted characters.",
+  "styles": {
+    "chibi": "Original cute chibi dark-fantasy game sprite, super-deformed 2.5-head proportions with an oversized round head and a small body, big expressive glossy eyes, thick clean dark outlines, smooth cel shading, bright saturated colors, soft warm rim light, strong readable silhouette at small size, no text, no watermark, no UI, no border, completely original design not based on any existing franchise or character.",
+    "cityfloor": "Original high-fantasy MMO capital environment art, painterly semi-realistic stylization, rich material detail, cinematic but evenly lit, directly overhead orthographic game background, strong readability, no text, no watermark, no UI, no border, no copyrighted characters.",
+    "icon": "Original classic MMO skill icon art, painterly semi-realistic stylization, bold centered symbol, glowing edges, rich contrast, clean readable silhouette, no text, no watermark, no border, no copyrighted artwork."
+  },
+  "assets": [
+    {
+      "id": "player_warrior_1",
+      "out": "assets/player/warrior_1.png",
+      "preset": "player",
+      "target": 512,
+      "size": "2K",
+      "keyColor": "#00FF00",
+      "style": "chibi",
+      "prompt": "An adorable chibi male human warrior, 2.5 heads tall, huge round head, big warm amber eyes, short messy chestnut hair, a tiny silver-and-blue plate armor set with golden lion-head pauldrons, a small round shield with a golden lion crest on the left arm, a short broad sword in the right hand, a tiny crimson cape, confident cheerful grin, full body, standing in a guard pose, facing right, feet together, centered, isolated on a completely flat uniform chroma-key green background, no gradient, no shadow, no floor."
+    },
+    {
+      "id": "player_warrior_2",
+      "out": "assets/player/warrior_2.png",
+      "preset": "player",
+      "target": 512,
+      "size": "2K",
+      "keyColor": "#00FF00",
+      "style": "chibi",
+      "prompt": "An adorable chibi female human warrior, 2.5 heads tall, huge round head, big fierce teal eyes, long red ponytail, compact blackened-steel armor with fluffy fur pauldrons and leather straps, an oversized two-handed sword resting on one shoulder, a tiny fang-like grin, full body, aggressive forward stance, facing right, centered, isolated on a completely flat uniform chroma-key green background, no gradient, no shadow, no floor."
+    },
+    {
+      "id": "player_mage_1",
+      "out": "assets/player/mage_1.png",
+      "preset": "player",
+      "target": 512,
+      "size": "2K",
+      "keyColor": "#00FF00",
+      "style": "chibi",
+      "prompt": "An adorable chibi male human mage, 2.5 heads tall, huge round head, big curious violet eyes, short black hair, hooded azure-and-gold robe with star trim, a wooden staff topped with a glowing blue crystal, tiny violet arcane runes floating around one hand, friendly smile, full body, facing right, centered, isolated on a completely flat uniform chroma-key green background, no gradient, no shadow, no floor."
+    },
+    {
+      "id": "player_mage_2",
+      "out": "assets/player/mage_2.png",
+      "preset": "player",
+      "target": 512,
+      "size": "2K",
+      "keyColor": "#00FF00",
+      "style": "chibi",
+      "prompt": "An adorable chibi female human frost mage, 2.5 heads tall, huge round head, big icy-blue eyes, long platinum braid, pale ice-blue and silver layered robe with snowflake trim, a crystal-tipped staff, three tiny snowflakes orbiting her shoulders, calm gentle smile, full body, facing right, centered, isolated on a completely flat uniform chroma-key green background, no gradient, no shadow, no floor."
+    },
+    {
+      "id": "enemy_slime",
+      "out": "assets/enemy/slime.png",
+      "preset": "enemy",
+      "target": 64,
+      "size": "1K",
+      "keyColor": "#FF00FF",
+      "style": "chibi",
+      "prompt": "An adorable chibi ooze blob creature, 2 heads tall, glossy translucent acid-green gel body with tiny trapped bubbles and small bone bits inside, two huge round yellow eyes, a tiny mischievous smile, little drips at the base, squat rounded silhouette with no arms, facing right, centered, isolated on a completely flat uniform chroma-key magenta background, no gradient, no shadow, no floor."
+    },
+    {
+      "id": "enemy_bat",
+      "out": "assets/enemy/bat.png",
+      "preset": "enemy",
+      "target": 64,
+      "size": "1K",
+      "keyColor": "#00FF00",
+      "style": "chibi",
+      "prompt": "An adorable chibi night bat monster, 2 heads tall, huge round head, big glowing red eyes, tiny white fangs, long silly ears, ragged dark-violet leathery wings spread wide, chubby little body, mid-flight pose, facing right, centered, isolated on a completely flat uniform chroma-key green background, no gradient, no shadow, no floor."
+    },
+    {
+      "id": "enemy_skeleton",
+      "out": "assets/enemy/skeleton.png",
+      "preset": "enemy",
+      "target": 64,
+      "size": "1K",
+      "keyColor": "#00FF00",
+      "style": "chibi",
+      "prompt": "An adorable chibi skeletal soldier, 2.5 heads tall, oversized round skull head with big glowing blue eye sockets, a tiny dented bronze helmet, cracked bronze armor plates, a rusty short sword in one hand and a small cracked round shield in the other, cheerful bony grin, full body, facing right, centered, isolated on a completely flat uniform chroma-key green background, no gradient, no shadow, no floor."
+    },
+    {
+      "id": "enemy_shooter",
+      "out": "assets/enemy/shooter.png",
+      "preset": "enemy",
+      "target": 64,
+      "size": "1K",
+      "keyColor": "#FF00FF",
+      "style": "chibi",
+      "prompt": "An adorable chibi hooded cultist spellcaster, 2.5 heads tall, oversized head hidden inside a deep-teal hood, three big glowing violet eyes under the hood, tiny hands holding a bone staff with a floating rune, small arcane sigils drifting around, mysterious but cute, full body, facing right, centered, isolated on a completely flat uniform chroma-key magenta background, no gradient, no shadow, no floor."
+    },
+    {
+      "id": "enemy_brute",
+      "out": "assets/enemy/brute.png",
+      "preset": "enemy",
+      "target": 64,
+      "size": "1K",
+      "keyColor": "#00FF00",
+      "style": "chibi",
+      "prompt": "An adorable chibi stone golem brute, 2 heads tall, oversized blocky granite head, big molten orange eyes, cracked granite body with glowing magma seams, huge stubby fists, moss and tiny ancient runes on the shoulders, grumpy but cute, full body, facing right, centered, isolated on a completely flat uniform chroma-key green background, no gradient, no shadow, no floor."
+    },
+    {
+      "id": "enemy_totem",
+      "out": "assets/enemy/totem.png",
+      "preset": "enemy",
+      "target": 64,
+      "size": "1K",
+      "keyColor": "#FF00FF",
+      "style": "chibi",
+      "prompt": "An adorable chibi voodoo totem, 2 heads tall, short carved dark-wood pillar with a painted bone-white skull face, two big glowing violet eyes, a tiny toothy grin, bright feather tufts and bone charms tied to the sides, a small floating green rune above its head, squat readable silhouette, facing right, centered, isolated on a completely flat uniform chroma-key magenta background, no gradient, no shadow, no floor."
+    },
+    {
+      "id": "boss_1",
+      "out": "assets/boss/abyss_eye_1.png",
+      "preset": "boss",
+      "target": 192,
+      "size": "2K",
+      "keyColor": "#00FF00",
+      "style": "chibi",
+      "prompt": "An adorable chibi tier-one abyssal eye monster, 2 heads tall, floating spherical body with one huge glossy vertical pupil, dark-violet iris, cracked obsidian shell plates, short wiggly tendrils, soft magenta glow, cute menacing expression, centered, isolated on a completely flat uniform chroma-key green background, no gradient, no shadow, no floor."
+    },
+    {
+      "id": "boss_2",
+      "out": "assets/boss/abyss_eye_2.png",
+      "preset": "boss",
+      "target": 192,
+      "size": "2K",
+      "keyColor": "#00FF00",
+      "style": "chibi",
+      "prompt": "An adorable chibi tier-two rift eye monster, 2 heads tall, floating eye with a jagged spatial rift splitting its shell, cold starlight leaking from the crack, several tiny eyes on short tendrils, violet and cyan glow, cute aggressive expression, centered, isolated on a completely flat uniform chroma-key green background, no gradient, no shadow, no floor."
+    },
+    {
+      "id": "boss_3",
+      "out": "assets/boss/abyss_eye_3.png",
+      "preset": "boss",
+      "target": 192,
+      "size": "2K",
+      "keyColor": "#00FF00",
+      "style": "chibi",
+      "prompt": "An adorable chibi tier-three void eye monster, 2.5 heads tall, floating void-black eye with a double-ring iris of violet and pale cyan, a halo of broken obsidian shards, many thin ribbon-like tentacles, deep-space sparkle inside the pupil, centered, isolated on a completely flat uniform chroma-key green background, no gradient, no shadow, no floor."
+    },
+    {
+      "id": "boss_4",
+      "out": "assets/boss/abyss_eye_4.png",
+      "preset": "boss",
+      "target": 192,
+      "size": "2K",
+      "keyColor": "#00FF00",
+      "style": "chibi",
+      "prompt": "An adorable chibi tier-four annihilation eye monster, 2.5 heads tall, burning crimson eye set in a broken black-metal halo, armored eyelids, glowing red veins, embers and sparks, cute furious expression, centered, isolated on a completely flat uniform chroma-key green background, no gradient, no shadow, no floor."
+    },
+    {
+      "id": "boss_5",
+      "out": "assets/boss/abyss_eye_5.png",
+      "preset": "boss",
+      "target": 192,
+      "size": "2K",
+      "keyColor": "#00FF00",
+      "style": "chibi",
+      "prompt": "An adorable chibi final-boss apocalypse eye, 3 heads tall, colossal three-ringed golden-crimson eye, crown of black thorns, dozens of tiny eyes opening across its shell, three concentric halos of light, adorable but awe-inspiring, centered, isolated on a completely flat uniform chroma-key green background, no gradient, no shadow, no floor."
+    },
+    {
+      "id": "boss_boar_king",
+      "out": "assets/boss/boar_king.png",
+      "preset": "boss",
+      "target": 192,
+      "size": "2K",
+      "keyColor": "#00FF00",
+      "style": "chibi",
+      "prompt": "An adorable chibi beast boss, a massive armored boar king, 2.5 heads tall, huge round bristly boar head with a snout, two big curved ivory tusks, small angry crimson eyes, dark-brown fur, iron-trimmed shoulder plates, a bone-and-tooth necklace, stubby powerful legs, lowered charging pose, cute furious expression, facing right, centered, isolated on a completely flat uniform chroma-key green background, no gradient, no shadow, no floor."
+    },
+    {
+      "id": "boss_stitched_abomination",
+      "out": "assets/boss/stitched_abomination.png",
+      "preset": "boss",
+      "target": 192,
+      "size": "2K",
+      "keyColor": "#FF00FF",
+      "style": "chibi",
+      "prompt": "An adorable chibi undead abomination boss, 3 heads tall, huge round stitched head with one big yellow eye and one small violet eye, patchwork grey-green flesh, rusty meat hook and cleaver, heavy chains wrapped around its arms, a tiny skull pauldron, goofy drooling grin, cute but gross, facing right, centered, isolated on a completely flat uniform chroma-key magenta background, no gradient, no shadow, no floor."
+    },
+    {
+      "id": "boss_voodoo_hexer",
+      "out": "assets/boss/voodoo_hexer.png",
+      "preset": "boss",
+      "target": 192,
+      "size": "2K",
+      "keyColor": "#FF00FF",
+      "style": "chibi",
+      "prompt": "An adorable chibi troll witch-doctor boss, 2.5 heads tall, huge round head with a bone skull mask, two little tusks, a purple mohawk, feathered voodoo staff topped with a glowing green skull, bone charms and tribal wraps, mischievous toothy grin, full body, facing right, centered, isolated on a completely flat uniform chroma-key magenta background, no gradient, no shadow, no floor."
+    },
+    {
+      "id": "boss_magma_tyrant",
+      "out": "assets/boss/magma_tyrant.png",
+      "preset": "boss",
+      "target": 192,
+      "size": "2K",
+      "keyColor": "#00FF00",
+      "style": "chibi",
+      "prompt": "An adorable chibi demon tyrant boss, 3 heads tall, huge round head with curved black horns, burning orange eyes, cracked obsidian armor with glowing magma veins, small bat wings, a massive flaming cleaver, hooved feet, cute furious grin, full body, facing right, centered, isolated on a completely flat uniform chroma-key green background, no gradient, no shadow, no floor."
+    },
+    {
+      "id": "boss_doom_dragon",
+      "out": "assets/boss/doom_dragon.png",
+      "preset": "boss",
+      "target": 192,
+      "size": "2K",
+      "keyColor": "#00FF00",
+      "style": "chibi",
+      "prompt": "An adorable chibi dragon boss, 2.5 heads tall, huge round dragon head with golden horns, glowing amber eyes, crimson-and-gold scales, small spread wings, a molten glowing chest, long tail, tiny arms holding a swirling fireball, cute but imposing, facing right, centered, isolated on a completely flat uniform chroma-key green background, no gradient, no shadow, no floor."
+    },
+    {
+      "id": "bg_scene_1",
+      "out": "assets/background/scene_1.png",
+      "preset": "background",
+      "width": 2400,
+      "height": 1600,
+      "size": "2K",
+      "keyColor": null,
+      "style": "cityfloor",
+      "prompt": "Directly overhead orthographic top-down view of a gloomy subterranean undead capital floor, a flat ground plane filling the entire frame, moss-green stone flagstones, straight toxic-green canal channels filled with murky water, iron grates and drain covers, bone-and-skull mosaics, scattered alchemy stains, dim sickly green lantern light, no horizon, no perspective, no walls, even lighting, low contrast in the center so sprites stay readable, no characters, no creatures, no text, no UI."
+    },
+    {
+      "id": "bg_scene_2",
+      "out": "assets/background/scene_2.png",
+      "preset": "background",
+      "width": 2400,
+      "height": 1600,
+      "size": "2K",
+      "keyColor": null,
+      "style": "cityfloor",
+      "prompt": "Directly overhead orthographic top-down view of a proud human castle-city plaza, a flat ground plane filling the entire frame, pale blue-grey cobblestones with white marble inlays, a large stylized golden lion-head crest mosaic in the center, blue-and-gold banners and flower planters seen from above, shallow clear canals along the edges, warm midday sunlight, no horizon, no perspective, no walls, even lighting, low contrast in the center so sprites stay readable, no characters, no creatures, no text, no UI."
+    },
+    {
+      "id": "bg_scene_3",
+      "out": "assets/background/scene_3.png",
+      "preset": "background",
+      "width": 2400,
+      "height": 1600,
+      "size": "2K",
+      "keyColor": null,
+      "style": "cityfloor",
+      "prompt": "Directly overhead orthographic top-down view of a floating magician-city plaza, a flat ground plane filling the entire frame, violet and white polished stone tiles, a huge glowing arcane rune circle inlaid in the floor, scattered blue crystals and floating books seen from above, soft purple magical glow, thin drifting arcane sparks, no horizon, no perspective, no walls, even lighting, low contrast in the center so sprites stay readable, no characters, no creatures, no text, no UI."
+    },
+    {
+      "id": "skill_heroic_strike",
+      "out": "assets/skill/heroic_strike.png",
+      "preset": "icon",
+      "style": "icon",
+      "target": 128,
+      "size": "1K",
+      "keyColor": "#00FF00",
+      "prompt": "Game skill icon: a single downward sword slash with a golden arc of force, bold centered symbol, dark-fantasy painterly style, glowing edges, high contrast, isolated on a completely flat uniform chroma-key green background, no text, no border."
+    },
+    {
+      "id": "skill_cleave",
+      "out": "assets/skill/cleave.png",
+      "preset": "icon",
+      "style": "icon",
+      "target": 128,
+      "size": "1K",
+      "keyColor": "#00FF00",
+      "prompt": "Game skill icon: a wide horizontal axe sweep leaving an orange crescent of force, bold centered symbol, dark-fantasy painterly style, glowing edges, isolated on a completely flat uniform chroma-key green background, no text, no border."
+    },
+    {
+      "id": "skill_whirlwind",
+      "out": "assets/skill/whirlwind.png",
+      "preset": "icon",
+      "style": "icon",
+      "target": 128,
+      "size": "1K",
+      "keyColor": "#00FF00",
+      "prompt": "Game skill icon: a spinning vortex of three curved blades with golden motion trails, bold centered symbol, dark-fantasy painterly style, glowing edges, isolated on a completely flat uniform chroma-key green background, no text, no border."
+    },
+    {
+      "id": "skill_shield_slam",
+      "out": "assets/skill/shield_slam.png",
+      "preset": "icon",
+      "style": "icon",
+      "target": 128,
+      "size": "1K",
+      "keyColor": "#00FF00",
+      "prompt": "Game skill icon: a round shield striking forward with a pale impact shockwave and cracked ground, bold centered symbol, dark-fantasy painterly style, glowing edges, isolated on a completely flat uniform chroma-key green background, no text, no border."
+    },
+    {
+      "id": "skill_thunder_clap",
+      "out": "assets/skill/thunder_clap.png",
+      "preset": "icon",
+      "style": "icon",
+      "target": 128,
+      "size": "1K",
+      "keyColor": "#00FF00",
+      "prompt": "Game skill icon: a circular lightning shockwave with violet electric arcs and a small shock ring, bold centered symbol, dark-fantasy painterly style, glowing edges, isolated on a completely flat uniform chroma-key green background, no text, no border."
+    },
+    {
+      "id": "skill_charge",
+      "out": "assets/skill/charge.png",
+      "preset": "icon",
+      "style": "icon",
+      "target": 128,
+      "size": "1K",
+      "keyColor": "#00FF00",
+      "prompt": "Game skill icon: a charging armored boot and shoulder with golden speed lines and dust, bold centered symbol, dark-fantasy painterly style, glowing edges, isolated on a completely flat uniform chroma-key green background, no text, no border."
+    },
+    {
+      "id": "skill_rend",
+      "out": "assets/skill/rend.png",
+      "preset": "icon",
+      "style": "icon",
+      "target": 128,
+      "size": "1K",
+      "keyColor": "#00FF00",
+      "prompt": "Game skill icon: three parallel claw slashes with red blood droplets and torn air, bold centered symbol, dark-fantasy painterly style, glowing edges, isolated on a completely flat uniform chroma-key green background, no text, no border."
+    },
+    {
+      "id": "skill_execute",
+      "out": "assets/skill/execute.png",
+      "preset": "icon",
+      "style": "icon",
+      "target": 128,
+      "size": "1K",
+      "keyColor": "#00FF00",
+      "prompt": "Game skill icon: a skull split by a downward blade with a crimson flash, bold centered symbol, dark-fantasy painterly style, glowing edges, isolated on a completely flat uniform chroma-key green background, no text, no border."
+    },
+    {
+      "id": "skill_victory_rush",
+      "out": "assets/skill/victory_rush.png",
+      "preset": "icon",
+      "style": "icon",
+      "target": 128,
+      "size": "1K",
+      "keyColor": "#00FF00",
+      "prompt": "Game skill icon: a small golden trophy overflowing with warm green healing light and rising sparks, bold centered symbol, dark-fantasy painterly style, glowing edges, isolated on a completely flat uniform chroma-key green background, no text, no border."
+    },
+    {
+      "id": "skill_battle_shout",
+      "out": "assets/skill/battle_shout.png",
+      "preset": "icon",
+      "style": "icon",
+      "target": 128,
+      "size": "1K",
+      "keyColor": "#00FF00",
+      "prompt": "Game skill icon: a curved war horn with orange sound rings and embers, bold centered symbol, dark-fantasy painterly style, glowing edges, isolated on a completely flat uniform chroma-key green background, no text, no border."
+    },
+    {
+      "id": "skill_shield_wall",
+      "out": "assets/skill/shield_wall.png",
+      "preset": "icon",
+      "style": "icon",
+      "target": 128,
+      "size": "1K",
+      "keyColor": "#00FF00",
+      "prompt": "Game skill icon: three overlapping tower shields forming a wall with a pale stone glow, bold centered symbol, dark-fantasy painterly style, glowing edges, isolated on a completely flat uniform chroma-key green background, no text, no border."
+    },
+    {
+      "id": "skill_revenge",
+      "out": "assets/skill/revenge.png",
+      "preset": "icon",
+      "style": "icon",
+      "target": 128,
+      "size": "1K",
+      "keyColor": "#00FF00",
+      "prompt": "Game skill icon: an explosive red counter-burst shaped like a striking fist, bold centered symbol, dark-fantasy painterly style, glowing edges, isolated on a completely flat uniform chroma-key green background, no text, no border."
+    },
+    {
+      "id": "skill_sunder_armor",
+      "out": "assets/skill/sunder_armor.png",
+      "preset": "icon",
+      "style": "icon",
+      "target": 128,
+      "size": "1K",
+      "keyColor": "#00FF00",
+      "prompt": "Game skill icon: a heavy hammer breaking a plate of armor into orange-hot fragments, bold centered symbol, dark-fantasy painterly style, glowing edges, isolated on a completely flat uniform chroma-key green background, no text, no border."
+    },
+    {
+      "id": "skill_overpower",
+      "out": "assets/skill/overpower.png",
+      "preset": "icon",
+      "style": "icon",
+      "target": 128,
+      "size": "1K",
+      "keyColor": "#00FF00",
+      "prompt": "Game skill icon: a critical-hit starburst around a golden sword point, bold centered symbol, dark-fantasy painterly style, glowing edges, isolated on a completely flat uniform chroma-key green background, no text, no border."
+    },
+    {
+      "id": "skill_bladestorm",
+      "out": "assets/skill/bladestorm.png",
+      "preset": "icon",
+      "style": "icon",
+      "target": 128,
+      "size": "1K",
+      "keyColor": "#00FF00",
+      "prompt": "Game skill icon: a tornado made of many spinning swords with golden wind trails, bold centered symbol, dark-fantasy painterly style, glowing edges, isolated on a completely flat uniform chroma-key green background, no text, no border."
+    },
+    {
+      "id": "skill_fireball",
+      "out": "assets/skill/fireball.png",
+      "preset": "icon",
+      "style": "icon",
+      "target": 128,
+      "size": "1K",
+      "keyColor": "#00FF00",
+      "prompt": "Game skill icon: a blazing orange fireball with a white-hot core and trailing embers, bold centered symbol, dark-fantasy painterly style, glowing edges, isolated on a completely flat uniform chroma-key green background, no text, no border."
+    },
+    {
+      "id": "skill_frostbolt",
+      "out": "assets/skill/frostbolt.png",
+      "preset": "icon",
+      "style": "icon",
+      "target": 128,
+      "size": "1K",
+      "keyColor": "#FF00FF",
+      "prompt": "Game skill icon: a sharp ice-shard arrow with pale blue frost mist and snowflakes, bold centered symbol, dark-fantasy painterly style, glowing edges, isolated on a completely flat uniform chroma-key magenta background, no text, no border."
+    },
+    {
+      "id": "skill_arcane_missiles",
+      "out": "assets/skill/arcane_missiles.png",
+      "preset": "icon",
+      "style": "icon",
+      "target": 128,
+      "size": "1K",
+      "keyColor": "#00FF00",
+      "prompt": "Game skill icon: three purple arcane bolts flying in formation with violet trails, bold centered symbol, dark-fantasy painterly style, glowing edges, isolated on a completely flat uniform chroma-key green background, no text, no border."
+    },
+    {
+      "id": "skill_frost_nova",
+      "out": "assets/skill/frost_nova.png",
+      "preset": "icon",
+      "style": "icon",
+      "target": 128,
+      "size": "1K",
+      "keyColor": "#FF00FF",
+      "prompt": "Game skill icon: a ring of jagged ice spikes erupting outward with pale blue light, bold centered symbol, dark-fantasy painterly style, glowing edges, isolated on a completely flat uniform chroma-key magenta background, no text, no border."
+    },
+    {
+      "id": "skill_blink",
+      "out": "assets/skill/blink.png",
+      "preset": "icon",
+      "style": "icon",
+      "target": 128,
+      "size": "1K",
+      "keyColor": "#00FF00",
+      "prompt": "Game skill icon: a robed silhouette teleporting between two afterimages with a violet spatial tear, bold centered symbol, dark-fantasy painterly style, glowing edges, isolated on a completely flat uniform chroma-key green background, no text, no border."
+    },
+    {
+      "id": "skill_ice_barrier",
+      "out": "assets/skill/ice_barrier.png",
+      "preset": "icon",
+      "style": "icon",
+      "target": 128,
+      "size": "1K",
+      "keyColor": "#FF00FF",
+      "prompt": "Game skill icon: a crystalline ice shield with layered frozen facets and pale blue glow, bold centered symbol, dark-fantasy painterly style, glowing edges, isolated on a completely flat uniform chroma-key magenta background, no text, no border."
+    },
+    {
+      "id": "skill_arcane_explosion",
+      "out": "assets/skill/arcane_explosion.png",
+      "preset": "icon",
+      "style": "icon",
+      "target": 128,
+      "size": "1K",
+      "keyColor": "#00FF00",
+      "prompt": "Game skill icon: a violet arcane explosion with concentric rings and floating runes, bold centered symbol, dark-fantasy painterly style, glowing edges, isolated on a completely flat uniform chroma-key green background, no text, no border."
+    },
+    {
+      "id": "skill_pyroblast",
+      "out": "assets/skill/pyroblast.png",
+      "preset": "icon",
+      "style": "icon",
+      "target": 128,
+      "size": "1K",
+      "keyColor": "#00FF00",
+      "prompt": "Game skill icon: a huge molten fire blast with a white core, orange shockwave and falling embers, bold centered symbol, dark-fantasy painterly style, glowing edges, isolated on a completely flat uniform chroma-key green background, no text, no border."
+    },
+    {
+      "id": "skill_blizzard",
+      "out": "assets/skill/blizzard.png",
+      "preset": "icon",
+      "style": "icon",
+      "target": 128,
+      "size": "1K",
+      "keyColor": "#FF00FF",
+      "prompt": "Game skill icon: a swirling snowstorm with icicles and a pale blue vortex, bold centered symbol, dark-fantasy painterly style, glowing edges, isolated on a completely flat uniform chroma-key magenta background, no text, no border."
+    },
+    {
+      "id": "skill_flamestrike",
+      "out": "assets/skill/flamestrike.png",
+      "preset": "icon",
+      "style": "icon",
+      "target": 128,
+      "size": "1K",
+      "keyColor": "#00FF00",
+      "prompt": "Game skill icon: a vertical column of fire erupting from cracked ground with orange and gold flames, bold centered symbol, dark-fantasy painterly style, glowing edges, isolated on a completely flat uniform chroma-key green background, no text, no border."
+    },
+    {
+      "id": "skill_arcane_power",
+      "out": "assets/skill/arcane_power.png",
+      "preset": "icon",
+      "style": "icon",
+      "target": 128,
+      "size": "1K",
+      "keyColor": "#00FF00",
+      "prompt": "Game skill icon: a glowing violet arcane rune empowering a small floating crystal, bold centered symbol, dark-fantasy painterly style, glowing edges, isolated on a completely flat uniform chroma-key green background, no text, no border."
+    },
+    {
+      "id": "skill_ice_block",
+      "out": "assets/skill/ice_block.png",
+      "preset": "icon",
+      "style": "icon",
+      "target": 128,
+      "size": "1K",
+      "keyColor": "#FF00FF",
+      "prompt": "Game skill icon: a mage silhouette encased in a faceted block of clear blue ice, bold centered symbol, dark-fantasy painterly style, glowing edges, isolated on a completely flat uniform chroma-key magenta background, no text, no border."
+    },
+    {
+      "id": "skill_dragon_breath",
+      "out": "assets/skill/dragon_breath.png",
+      "preset": "icon",
+      "style": "icon",
+      "target": 128,
+      "size": "1K",
+      "keyColor": "#00FF00",
+      "prompt": "Game skill icon: a dragon-shaped torrent of orange flame with a visible head and wings, bold centered symbol, dark-fantasy painterly style, glowing edges, isolated on a completely flat uniform chroma-key green background, no text, no border."
+    },
+    {
+      "id": "skill_cone_of_cold",
+      "out": "assets/skill/cone_of_cold.png",
+      "preset": "icon",
+      "style": "icon",
+      "target": 128,
+      "size": "1K",
+      "keyColor": "#FF00FF",
+      "prompt": "Game skill icon: a widening cone of pale-blue frost breath with ice crystals, bold centered symbol, dark-fantasy painterly style, glowing edges, isolated on a completely flat uniform chroma-key magenta background, no text, no border."
+    },
+    {
+      "id": "skill_arcane_torrent",
+      "out": "assets/skill/arcane_torrent.png",
+      "preset": "icon",
+      "style": "icon",
+      "target": 128,
+      "size": "1K",
+      "keyColor": "#00FF00",
+      "prompt": "Game skill icon: a rushing torrent of violet arcane energy with spiral trails and sparks, bold centered symbol, dark-fantasy painterly style, glowing edges, isolated on a completely flat uniform chroma-key green background, no text, no border."
+    },
+    {
+      "id": "talent_arms_core",
+      "out": "assets/talent/arms_core.png",
+      "preset": "icon",
+      "target": 128,
+      "size": "1K",
+      "keyColor": "#00FF00",
+      "style": "icon",
+      "prompt": "Game talent icon: crossed golden longswords in front of a round steel buckler with crimson banner ribbons and a warm gold glow, bold centered symbol, dark-fantasy painterly style, glowing edges, rich contrast, clean readable silhouette, isolated on a completely flat uniform chroma-key green background, no text, no watermark, no border."
+    },
+    {
+      "id": "talent_arms_vit",
+      "out": "assets/talent/arms_vit.png",
+      "preset": "icon",
+      "target": 128,
+      "size": "1K",
+      "keyColor": "#00FF00",
+      "style": "icon",
+      "prompt": "Game talent icon: a polished steel-plated torso with a glowing iron heart, rivets and pale steel light, bold centered symbol, dark-fantasy painterly style, glowing edges, rich contrast, clean readable silhouette, isolated on a completely flat uniform chroma-key green background, no text, no watermark, no border."
+    },
+    {
+      "id": "talent_arms_power",
+      "out": "assets/talent/arms_power.png",
+      "preset": "icon",
+      "target": 128,
+      "size": "1K",
+      "keyColor": "#00FF00",
+      "style": "icon",
+      "prompt": "Game talent icon: a crimson upward sword-shaped surge with floating sharp shards and a halo of killing intent, bold centered symbol, dark-fantasy painterly style, glowing edges, rich contrast, clean readable silhouette, isolated on a completely flat uniform chroma-key green background, no text, no watermark, no border."
+    },
+    {
+      "id": "talent_arms_util",
+      "out": "assets/talent/arms_util.png",
+      "preset": "icon",
+      "target": 128,
+      "size": "1K",
+      "keyColor": "#00FF00",
+      "style": "icon",
+      "prompt": "Game talent icon: a weathered round campaign shield with a bronze laurel wreath and small medals, bold centered symbol, dark-fantasy painterly style, glowing edges, rich contrast, clean readable silhouette, isolated on a completely flat uniform chroma-key green background, no text, no watermark, no border."
+    },
+    {
+      "id": "talent_arms_key",
+      "out": "assets/talent/arms_key.png",
+      "preset": "icon",
+      "target": 128,
+      "size": "1K",
+      "keyColor": "#00FF00",
+      "style": "icon",
+      "prompt": "Game talent icon: a crowned golden greatsword with spread eagle wings and radiating holy light, bold centered symbol, dark-fantasy painterly style, glowing edges, rich contrast, clean readable silhouette, isolated on a completely flat uniform chroma-key green background, no text, no watermark, no border."
+    },
+    {
+      "id": "talent_fury_core",
+      "out": "assets/talent/fury_core.png",
+      "preset": "icon",
+      "target": 128,
+      "size": "1K",
+      "keyColor": "#00FF00",
+      "style": "icon",
+      "prompt": "Game talent icon: a roaring berserker flame rune shaped like a snarling wolf head, crimson fire and smoke, bold centered symbol, dark-fantasy painterly style, glowing edges, rich contrast, clean readable silhouette, isolated on a completely flat uniform chroma-key green background, no text, no watermark, no border."
+    },
+    {
+      "id": "talent_fury_vit",
+      "out": "assets/talent/fury_vit.png",
+      "preset": "icon",
+      "target": 128,
+      "size": "1K",
+      "keyColor": "#00FF00",
+      "style": "icon",
+      "prompt": "Game talent icon: a wild beating heart wrapped in thorned red flames and iron chains, bold centered symbol, dark-fantasy painterly style, glowing edges, rich contrast, clean readable silhouette, isolated on a completely flat uniform chroma-key green background, no text, no watermark, no border."
+    },
+    {
+      "id": "talent_fury_power",
+      "out": "assets/talent/fury_power.png",
+      "preset": "icon",
+      "target": 128,
+      "size": "1K",
+      "keyColor": "#00FF00",
+      "style": "icon",
+      "prompt": "Game talent icon: a clenched armored gauntlet punching forward with red lightning and a shockwave, bold centered symbol, dark-fantasy painterly style, glowing edges, rich contrast, clean readable silhouette, isolated on a completely flat uniform chroma-key green background, no text, no watermark, no border."
+    },
+    {
+      "id": "talent_fury_util",
+      "out": "assets/talent/fury_util.png",
+      "preset": "icon",
+      "target": 128,
+      "size": "1K",
+      "keyColor": "#00FF00",
+      "style": "icon",
+      "prompt": "Game talent icon: a winged leather boot with white wind streaks and dust trails, bold centered symbol, dark-fantasy painterly style, glowing edges, rich contrast, clean readable silhouette, isolated on a completely flat uniform chroma-key green background, no text, no watermark, no border."
+    },
+    {
+      "id": "talent_fury_key",
+      "out": "assets/talent/fury_key.png",
+      "preset": "icon",
+      "target": 128,
+      "size": "1K",
+      "keyColor": "#00FF00",
+      "style": "icon",
+      "prompt": "Game talent icon: a horned berserker war mask engulfed in a pillar of crimson flame, bold centered symbol, dark-fantasy painterly style, glowing edges, rich contrast, clean readable silhouette, isolated on a completely flat uniform chroma-key green background, no text, no watermark, no border."
+    },
+    {
+      "id": "talent_protection_core",
+      "out": "assets/talent/protection_core.png",
+      "preset": "icon",
+      "target": 128,
+      "size": "1K",
+      "keyColor": "#00FF00",
+      "style": "icon",
+      "prompt": "Game talent icon: a massive tower shield with a guardian eye sigil and a blue steel glow, bold centered symbol, dark-fantasy painterly style, glowing edges, rich contrast, clean readable silhouette, isolated on a completely flat uniform chroma-key green background, no text, no watermark, no border."
+    },
+    {
+      "id": "talent_protection_vit",
+      "out": "assets/talent/protection_vit.png",
+      "preset": "icon",
+      "target": 128,
+      "size": "1K",
+      "keyColor": "#00FF00",
+      "style": "icon",
+      "prompt": "Game talent icon: an unbreakable stone heart wrapped in iron bands with a warm amber glow, bold centered symbol, dark-fantasy painterly style, glowing edges, rich contrast, clean readable silhouette, isolated on a completely flat uniform chroma-key green background, no text, no watermark, no border."
+    },
+    {
+      "id": "talent_protection_power",
+      "out": "assets/talent/protection_power.png",
+      "preset": "icon",
+      "target": 128,
+      "size": "1K",
+      "keyColor": "#00FF00",
+      "style": "icon",
+      "prompt": "Game talent icon: a heavy warhammer smashing a stone plate with a radial shockwave, bold centered symbol, dark-fantasy painterly style, glowing edges, rich contrast, clean readable silhouette, isolated on a completely flat uniform chroma-key green background, no text, no watermark, no border."
+    },
+    {
+      "id": "talent_protection_util",
+      "out": "assets/talent/protection_util.png",
+      "preset": "icon",
+      "target": 128,
+      "size": "1K",
+      "keyColor": "#00FF00",
+      "style": "icon",
+      "prompt": "Game talent icon: a green regeneration cross made of interlocking metal plates with rising sparks, bold centered symbol, dark-fantasy painterly style, glowing edges, rich contrast, clean readable silhouette, isolated on a completely flat uniform chroma-key green background, no text, no watermark, no border."
+    },
+    {
+      "id": "talent_protection_key",
+      "out": "assets/talent/protection_key.png",
+      "preset": "icon",
+      "target": 128,
+      "size": "1K",
+      "keyColor": "#00FF00",
+      "style": "icon",
+      "prompt": "Game talent icon: a fortress wall with a golden banner and shield, surrounded by an impenetrable blue aura, bold centered symbol, dark-fantasy painterly style, glowing edges, rich contrast, clean readable silhouette, isolated on a completely flat uniform chroma-key green background, no text, no watermark, no border."
+    },
+    {
+      "id": "talent_fire_core",
+      "out": "assets/talent/fire_core.png",
+      "preset": "icon",
+      "target": 128,
+      "size": "1K",
+      "keyColor": "#00FF00",
+      "style": "icon",
+      "prompt": "Game talent icon: a circular flame rune with a blazing core and orbiting embers, bold centered symbol, dark-fantasy painterly style, glowing edges, rich contrast, clean readable silhouette, isolated on a completely flat uniform chroma-key green background, no text, no watermark, no border."
+    },
+    {
+      "id": "talent_fire_vit",
+      "out": "assets/talent/fire_vit.png",
+      "preset": "icon",
+      "target": 128,
+      "size": "1K",
+      "keyColor": "#00FF00",
+      "style": "icon",
+      "prompt": "Game talent icon: a heart made of living fire with molten cracks and warm inner light, bold centered symbol, dark-fantasy painterly style, glowing edges, rich contrast, clean readable silhouette, isolated on a completely flat uniform chroma-key green background, no text, no watermark, no border."
+    },
+    {
+      "id": "talent_fire_power",
+      "out": "assets/talent/fire_power.png",
+      "preset": "icon",
+      "target": 128,
+      "size": "1K",
+      "keyColor": "#00FF00",
+      "style": "icon",
+      "prompt": "Game talent icon: an upward flame arrow with a long ember trail and red heat distortion, bold centered symbol, dark-fantasy painterly style, glowing edges, rich contrast, clean readable silhouette, isolated on a completely flat uniform chroma-key green background, no text, no watermark, no border."
+    },
+    {
+      "id": "talent_fire_util",
+      "out": "assets/talent/fire_util.png",
+      "preset": "icon",
+      "target": 128,
+      "size": "1K",
+      "keyColor": "#00FF00",
+      "style": "icon",
+      "prompt": "Game talent icon: spreading tendrils of fire crawling outward across dark ground, bold centered symbol, dark-fantasy painterly style, glowing edges, rich contrast, clean readable silhouette, isolated on a completely flat uniform chroma-key green background, no text, no watermark, no border."
+    },
+    {
+      "id": "talent_fire_key",
+      "out": "assets/talent/fire_key.png",
+      "preset": "icon",
+      "target": 128,
+      "size": "1K",
+      "keyColor": "#00FF00",
+      "style": "icon",
+      "prompt": "Game talent icon: a crown of fire floating above a blazing orb, orange-gold and regal, bold centered symbol, dark-fantasy painterly style, glowing edges, rich contrast, clean readable silhouette, isolated on a completely flat uniform chroma-key green background, no text, no watermark, no border."
+    },
+    {
+      "id": "talent_frost_core",
+      "out": "assets/talent/frost_core.png",
+      "preset": "icon",
+      "target": 128,
+      "size": "1K",
+      "keyColor": "#00FF00",
+      "style": "icon",
+      "prompt": "Game talent icon: a six-pointed snowflake rune carved in ice with a pale blue glow, bold centered symbol, dark-fantasy painterly style, glowing edges, rich contrast, clean readable silhouette, isolated on a completely flat uniform chroma-key green background, no text, no watermark, no border."
+    },
+    {
+      "id": "talent_frost_vit",
+      "out": "assets/talent/frost_vit.png",
+      "preset": "icon",
+      "target": 128,
+      "size": "1K",
+      "keyColor": "#00FF00",
+      "style": "icon",
+      "prompt": "Game talent icon: a crystal heart encased in clear ice with curling frost mist, bold centered symbol, dark-fantasy painterly style, glowing edges, rich contrast, clean readable silhouette, isolated on a completely flat uniform chroma-key green background, no text, no watermark, no border."
+    },
+    {
+      "id": "talent_frost_power",
+      "out": "assets/talent/frost_power.png",
+      "preset": "icon",
+      "target": 128,
+      "size": "1K",
+      "keyColor": "#00FF00",
+      "style": "icon",
+      "prompt": "Game talent icon: a sharp icicle spear with piercing white-blue light and shattered ice, bold centered symbol, dark-fantasy painterly style, glowing edges, rich contrast, clean readable silhouette, isolated on a completely flat uniform chroma-key green background, no text, no watermark, no border."
+    },
+    {
+      "id": "talent_frost_util",
+      "out": "assets/talent/frost_util.png",
+      "preset": "icon",
+      "target": 128,
+      "size": "1K",
+      "keyColor": "#00FF00",
+      "style": "icon",
+      "prompt": "Game talent icon: a block of layered ice with a shield-shaped facet and cold vapor, bold centered symbol, dark-fantasy painterly style, glowing edges, rich contrast, clean readable silhouette, isolated on a completely flat uniform chroma-key green background, no text, no watermark, no border."
+    },
+    {
+      "id": "talent_frost_key",
+      "out": "assets/talent/frost_key.png",
+      "preset": "icon",
+      "target": 128,
+      "size": "1K",
+      "keyColor": "#00FF00",
+      "style": "icon",
+      "prompt": "Game talent icon: a frozen crown with an absolute-zero blue aura and hanging icicles, bold centered symbol, dark-fantasy painterly style, glowing edges, rich contrast, clean readable silhouette, isolated on a completely flat uniform chroma-key green background, no text, no watermark, no border."
+    },
+    {
+      "id": "talent_arcane_core",
+      "out": "assets/talent/arcane_core.png",
+      "preset": "icon",
+      "target": 128,
+      "size": "1K",
+      "keyColor": "#00FF00",
+      "style": "icon",
+      "prompt": "Game talent icon: a floating violet arcane eye orb with concentric runic rings, bold centered symbol, dark-fantasy painterly style, glowing edges, rich contrast, clean readable silhouette, isolated on a completely flat uniform chroma-key green background, no text, no watermark, no border."
+    },
+    {
+      "id": "talent_arcane_vit",
+      "out": "assets/talent/arcane_vit.png",
+      "preset": "icon",
+      "target": 128,
+      "size": "1K",
+      "keyColor": "#00FF00",
+      "style": "icon",
+      "prompt": "Game talent icon: a glowing violet mana heart with luminous arcane veins, bold centered symbol, dark-fantasy painterly style, glowing edges, rich contrast, clean readable silhouette, isolated on a completely flat uniform chroma-key green background, no text, no watermark, no border."
+    },
+    {
+      "id": "talent_arcane_power",
+      "out": "assets/talent/arcane_power.png",
+      "preset": "icon",
+      "target": 128,
+      "size": "1K",
+      "keyColor": "#00FF00",
+      "style": "icon",
+      "prompt": "Game talent icon: a surging wave of violet mana with floating runes and sparks, bold centered symbol, dark-fantasy painterly style, glowing edges, rich contrast, clean readable silhouette, isolated on a completely flat uniform chroma-key green background, no text, no watermark, no border."
+    },
+    {
+      "id": "talent_arcane_util",
+      "out": "assets/talent/arcane_util.png",
+      "preset": "icon",
+      "target": 128,
+      "size": "1K",
+      "keyColor": "#00FF00",
+      "style": "icon",
+      "prompt": "Game talent icon: an arcane hourglass with glowing violet sand and time runes, bold centered symbol, dark-fantasy painterly style, glowing edges, rich contrast, clean readable silhouette, isolated on a completely flat uniform chroma-key green background, no text, no watermark, no border."
+    },
+    {
+      "id": "talent_arcane_key",
+      "out": "assets/talent/arcane_key.png",
+      "preset": "icon",
+      "target": 128,
+      "size": "1K",
+      "keyColor": "#00FF00",
+      "style": "icon",
+      "prompt": "Game talent icon: an overloaded violet arcane crystal exploding with rings of runes and sparks, bold centered symbol, dark-fantasy painterly style, glowing edges, rich contrast, clean readable silhouette, isolated on a completely flat uniform chroma-key green background, no text, no watermark, no border."
+    }
+  ]
+}

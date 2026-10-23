@@ -1,0 +1,11 @@
+{
+  "baseURL": "https://ark.cn-beijing.volces.com/api/v3",
+  "model": "doubao-seedream-5-0-flash-260915",
+  "size": "2K",
+  "outputFormat": "png",
+  "watermark": false,
+  "concurrency": 2,
+  "retries": 2,
+  "requestTimeoutMs": 180000,
+  "python": ""
+}

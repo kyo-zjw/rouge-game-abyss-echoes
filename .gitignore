@@ -1,0 +1,17 @@
+# Seedream runtime artifacts
+tools/.cache/
+tools/seedream.manifest.json
+*.preview.png
+
+# local backups / snapshots
+tools/.backup/
+
+# local API keys
+.env
+.env.local
+tools/seedream.user.json
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+desktop.ini
