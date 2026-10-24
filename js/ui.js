@@ -53,15 +53,21 @@ const SKILL_FIELDS = {
   aoe: ['爆炸半径', v => Math.round(v)],
   castRange: ['施法距离', v => Math.round(v)],
   count: ['弹数', v => v],
+  volleys: ['轮次', v => v],
   chains: ['连锁', v => v],
   shield: ['护盾', v => Math.round(v)],
   duration: ['持续', v => v.toFixed(1) + 's'],
   slow: ['减速', v => Math.round(v * 100) + '%'],
+  slowT: ['减速时长', v => v.toFixed(1) + 's'],
   dmgMul: ['增伤', v => '+' + Math.round(v * 100) + '%'],
   healPct: ['回复', v => Math.round(v * 100) + '%'],
   knock: ['击退', v => Math.round(v)],
   vuln: ['易伤', v => Math.round(v * 100) + '%'],
   distance: ['距离', v => Math.round(v)],
+  width: ['宽度', v => Math.round(v)],
+  length: ['长度', v => Math.round(v)],
+  tick: ['伤害间隔', v => v.toFixed(2) + 's'],
+  dps: ['每秒伤害', v => Math.round(v)],
   speed: ['弹速', v => Math.round(v)]
 };
 
@@ -978,7 +984,7 @@ const UI = {
       this.skillIcon(ctx, d.id, dx + dw / 2, dy + 17, 23, def.color, def.icon);
       ctx.globalAlpha = 1;
       ctx.globalAlpha = ready ? 1 : 0.4;
-      this.label(ctx, '空格', dx + dw / 2, dy - 10, 10, ready ? def.color : C.dim, 700, 'center');
+      this.label(ctx, '空格 · Lv' + p.dispLevel(), dx + dw / 2, dy - 10, 10, ready ? def.color : C.dim, 700, 'center');
       ctx.globalAlpha = 1;
       // 充能点
       for (let k = 0; k < d.max; k++) {

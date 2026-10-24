@@ -42,8 +42,9 @@ function talentNode(id, ring, offset, name, icon, type, cost, req, effect, reqRa
   };
 }
 
-/* 每系固定骨架：core / skill1 / vitality / skill2 / skill3 /
-   power / skill4 / skill5 / utility / keystone */
+/* 每系固定骨架（11 节点）:
+   core / skill1 / vitality / skill2 / skill3 / power / skill4 /
+   synergy(跨技能) / skill5 / utility / keystone */
 function makeBranch(o) {
   const id = k => o.id + '.' + k;
   const core = id('core');
@@ -53,6 +54,7 @@ function makeBranch(o) {
   const skill3 = id('skill3');
   const power = id('power');
   const skill4 = id('skill4');
+  const synergy = id('synergy');
   const skill5 = id('skill5');
   const utility = id('utility');
 
@@ -81,9 +83,13 @@ function makeBranch(o) {
       talentNode(skill4, 4, 14, o.s4.name, o.s4.icon, 'skill',
         TALENT_COST.skill, [skill3], o.s4.effect),
 
-      talentNode(skill5, 5, -16, o.s5.name, o.s5.icon, 'skill',
+      // 跨技能节点: 同时强化本系两个技能, 让「同系连拿」有额外回报
+      talentNode(synergy, 5, 0, o.syn.name, o.syn.icon, 'skill',
+        TALENT_COST.skill, [skill4], o.syn.effect),
+
+      talentNode(skill5, 5, -26, o.s5.name, o.s5.icon, 'skill',
         TALENT_COST.skill, [skill4], o.s5.effect),
-      talentNode(utility, 5, 16, o.util.name, o.util.icon, 'utility',
+      talentNode(utility, 5, 26, o.util.name, o.util.icon, 'utility',
         TALENT_COST.utility, [power], o.util.effect),
 
       talentNode(id('keystone'), 6, 0, o.key.name, o.key.icon, 'keystone',
@@ -108,6 +114,10 @@ CONTENT.talentTrees = {
         s3: { name: '撕裂', icon: '🩸', effect: { skills: { rend: { dmg: 0.08, dot: 0.08 } } } },
         s4: { name: '破甲', icon: '🔨', effect: { skills: { sunder_armor: { dmg: 0.08, vuln: 0.04 } } } },
         s5: { name: '压制', icon: '🎯', effect: { skills: { overpower: { dmg: 0.08, cd: -0.03 } } } },
+        syn: {
+          name: '军神', icon: '🎖',
+          effect: { skills: { heroic_strike: { dmg: 0.05 }, overpower: { dmg: 0.05 } } }
+        },
         key: { name: '武器宗师', icon: '👑', effect: { branchDmg: 0.25, branchArea: 0.10 } }
       }),
       makeBranch({
@@ -122,6 +132,10 @@ CONTENT.talentTrees = {
         s3: { name: '胜利在望', icon: '🏆', effect: { skills: { victory_rush: { heal: 0.08, internal: -0.03 } } } },
         s4: { name: '剑刃风暴', icon: '🌪', effect: { skills: { bladestorm: { dmg: 0.08, area: 0.04 } } } },
         s5: { name: '复仇', icon: '💥', effect: { skills: { revenge: { dmg: 0.08, cd: -0.03 } } } },
+        syn: {
+          name: '血性', icon: '🩸',
+          effect: { skills: { whirlwind: { dmg: 0.05 }, bladestorm: { dmg: 0.05 } } }
+        },
         key: {
           name: '狂怒化身', icon: '👹',
           effect: { branchDmg: 0.20, onKillHaste: { mul: 1.25, duration: 2 } }
@@ -139,6 +153,10 @@ CONTENT.talentTrees = {
         s3: { name: '盾墙', icon: '🧱', effect: { skills: { shield_wall: { shield: 0.10, duration: 0.04 } } } },
         s4: { name: '冲锋', icon: '🏃', effect: { skills: { charge: { cd: -0.05, dist: 0.04 } } } },
         s5: { name: '战斗怒吼', icon: '📢', effect: { skills: { battle_shout: { buff: 0.08, duration: 0.04 } } } },
+        syn: {
+          name: '壁垒', icon: '🧱',
+          effect: { skills: { shield_wall: { shield: 0.06 }, battle_shout: { buff: 0.05 } } }
+        },
         key: { name: '不屈壁垒', icon: '🏰', effect: { hpPct: 0.15, armorAdd: 0.08, regenAdd: 2 } }
       })
     ]
@@ -148,16 +166,17 @@ CONTENT.talentTrees = {
     branches: [
       makeBranch({
         id: 'fire', name: '火焰', color: '#ff9f43', angle: -Math.PI / 2,
-        skills: ['fireball', 'pyroblast', 'flamestrike', 'dragon_breath'],
+        skills: ['fireball', 'pyroblast', 'flamestrike', 'dragon_breath', 'shockwave'],
         core: { name: '火焰精通', icon: '🔥' },
         vit: { name: '炽热之躯', icon: '❤' },
         power: { name: '燃烧', icon: '🔺' },
         util: { name: '蔓延', icon: '◎', effect: { areaPct: 0.04 } },
         s1: { name: '火球术', icon: '🔥', effect: { skills: { fireball: { dmg: 0.08, cd: -0.03 } } } },
-        s2: { name: '炎爆术', icon: '☄', effect: { skills: { pyroblast: { dmg: 0.08, area: 0.04 } } } },
+        s2: { name: '炎爆术', icon: '☄', effect: { skills: { pyroblast: { dmg: 0.08, area: 0.04, dot: 0.10 } } } },
         s3: { name: '烈焰风暴', icon: '🌋', effect: { skills: { flamestrike: { dmg: 0.08, area: 0.04 } } } },
         s4: { name: '龙息', icon: '🐉', effect: { skills: { dragon_breath: { dmg: 0.08, dot: 0.08 } } } },
-        s5: {
+        s5: { name: '冲击波', icon: '💥', effect: { skills: { shockwave: { dmg: 0.08, area: 0.04, knock: 0.06 } } } },
+        syn: {
           name: '余烬', icon: '✨',
           effect: { skills: { fireball: { dmg: 0.04, cd: -0.02 }, pyroblast: { dmg: 0.04, cd: -0.02 } } }
         },
@@ -165,7 +184,7 @@ CONTENT.talentTrees = {
       }),
       makeBranch({
         id: 'frost', name: '冰霜', color: '#74c0fc', angle: Math.PI / 6,
-        skills: ['frostbolt', 'frost_nova', 'ice_barrier', 'ice_block', 'blizzard', 'cone_of_cold'],
+        skills: ['frostbolt', 'frost_nova', 'ice_barrier', 'blizzard', 'cone_of_cold'],
         core: { name: '冰霜精通', icon: '❄' },
         vit: { name: '寒冰护体', icon: '❤' },
         power: { name: '刺骨', icon: '🔺' },
@@ -174,24 +193,37 @@ CONTENT.talentTrees = {
         s2: { name: '冰霜新星', icon: '💫', effect: { skills: { frost_nova: { dmg: 0.08, area: 0.04 } } } },
         s3: {
           name: '霜甲', icon: '🧊',
-          effect: { skills: { ice_barrier: { shield: 0.10, duration: 0.04 }, ice_block: { duration: 0.05 } } }
+          effect: { skills: { ice_barrier: { shield: 0.10, duration: 0.04 } } }
         },
         s4: { name: '暴风雪', icon: '🌨', effect: { skills: { blizzard: { dmg: 0.08, area: 0.04 } } } },
         s5: { name: '冰锥术', icon: '🌬', effect: { skills: { cone_of_cold: { dmg: 0.08, slow: 0.04 } } } },
+        syn: {
+          name: '霜噬', icon: '🥶',
+          effect: {
+            skills: { frostbolt: { dmg: 0.06 }, cone_of_cold: { dmg: 0.06 } },
+            vsSlowed: 0.06
+          }
+        },
         key: { name: '绝对零度', icon: '🧊', effect: { branchDmg: 0.15, hpPct: 0.10, armorAdd: 0.06 } }
       }),
       makeBranch({
         id: 'arcane', name: '奥术', color: '#b197fc', angle: Math.PI * 5 / 6,
-        skills: ['arcane_missiles', 'blink', 'arcane_explosion', 'arcane_power', 'arcane_torrent'],
+        skills: ['arcane_missiles', 'arcane_explosion', 'arcane_power', 'arcane_torrent', 'arcane_field'],
         core: { name: '奥术精通', icon: '🔮' },
         vit: { name: '奥能灌注', icon: '❤' },
         power: { name: '法力涌动', icon: '🔺' },
         util: { name: '加速', icon: '⏱', effect: { cdrPct: 0.02 } },
         s1: { name: '奥术飞弹', icon: '✨', effect: { skills: { arcane_missiles: { dmg: 0.08, cd: -0.03 } } } },
-        s2: { name: '闪现', icon: '🌌', effect: { skills: { blink: { cd: -0.06, dist: 0.04 } } } },
-        s3: { name: '魔爆术', icon: '💠', effect: { skills: { arcane_explosion: { dmg: 0.08, area: 0.04 } } } },
-        s4: { name: '奥术强化', icon: '🔮', effect: { skills: { arcane_power: { buff: 0.08, duration: 0.04 } } } },
-        s5: { name: '奥术洪流', icon: '⚡', effect: { skills: { arcane_torrent: { dmg: 0.08, cd: -0.03 } } } },
+        s2: { name: '魔爆术', icon: '💠', effect: { skills: { arcane_explosion: { dmg: 0.08, area: 0.04 } } } },
+        s3: { name: '奥术强化', icon: '🔮', effect: { skills: { arcane_power: { buff: 0.08, duration: 0.04 } } } },
+        s4: { name: '奥术洪流', icon: '⚡', effect: { skills: { arcane_torrent: { dmg: 0.08, width: 0.06 } } } },
+        s5: { name: '奥术力场', icon: '❇', effect: { skills: { arcane_field: { dmg: 0.08, area: 0.04, slow: 0.03 } } } },
+        syn: {
+          name: '奥能共振', icon: '🔗',
+          effect: {
+            skills: { arcane_missiles: { dmg: 0.05, cd: -0.02 }, arcane_torrent: { dmg: 0.05, cd: -0.02 } }
+          }
+        },
         key: { name: '奥能超载', icon: '💥', effect: { branchDmg: 0.20, branchCdr: 0.12 } }
       })
     ]
@@ -351,7 +383,7 @@ const Talents = {
     const out = {
       hpPct: 0, dmgPct: 0, cdrPct: 0, armorAdd: 0, speedAdd: 0,
       regenAdd: 0, magnetAdd: 0, areaPct: 0, xpPct: 0, goldPct: 0,
-      skills: Object.create(null), onKill: null
+      vsSlowed: 0, skills: Object.create(null), onKill: null
     };
     const tree = this.tree(classId);
     if (!tree) return out;
@@ -381,6 +413,7 @@ const Talents = {
         if (e.areaPct) out.areaPct += e.areaPct * rank;
         if (e.xpPct) out.xpPct += e.xpPct * rank;
         if (e.goldPct) out.goldPct += e.goldPct * rank;
+        if (e.vsSlowed) out.vsSlowed += e.vsSlowed * rank;
 
         if (e.onKillHaste) {
           out.onKill = {
@@ -468,6 +501,7 @@ const Talents = {
     if (e.areaPct) parts.push('技能范围 +' + pct(e.areaPct * rank));
     if (e.xpPct) parts.push('经验 +' + pct(e.xpPct * rank));
     if (e.goldPct) parts.push('金币 +' + pct(e.goldPct * rank));
+    if (e.vsSlowed) parts.push('对减速目标伤害 +' + pct(e.vsSlowed * rank));
 
     if (e.onKillHaste) {
       const mul = 1 + (e.onKillHaste.mul - 1) * rank;
@@ -482,6 +516,7 @@ const Talents = {
         if (m.dmg) parts.push(name + '伤害 +' + pct(m.dmg * rank));
         if (m.cd) parts.push(name + '冷却 -' + pct(Math.abs(m.cd) * rank));
         if (m.area) parts.push(name + '范围 +' + pct(m.area * rank));
+        if (m.width) parts.push(name + '宽度 +' + pct(m.width * rank));
         if (m.duration) parts.push(name + '持续 +' + pct(m.duration * rank));
         if (m.shield) parts.push(name + '护盾 +' + pct(m.shield * rank));
         if (m.buff) parts.push(name + '增益强度 +' + pct(m.buff * rank));

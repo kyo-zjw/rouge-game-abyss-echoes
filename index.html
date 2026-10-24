@@ -13,6 +13,9 @@
 <body>
 <canvas id="game"></canvas>
 
+<!-- index.html?lab=1 直接跳技能试验场 -->
+<script>if (/[?&]lab=1/.test(location.search)) location.replace('lab.html');</script>
+
 <script src="js/content.js"></script>
 <script src="js/talents.js"></script>
 <script src="js/core.js"></script>

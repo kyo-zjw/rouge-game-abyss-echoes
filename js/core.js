@@ -143,7 +143,7 @@ const Sfx = {
     if (!this.enabled || !this.ac) return;
     const now = this.ac.currentTime;
     const gates = { shoot: 0.06, hit: 0.035, kill: 0.03, pick: 0.04, hurt: 0.1, coin: 0.04, buy: 0.08,
-      slash: 0.05, heavy: 0.08, quake: 0.22, whirl: 0.16 };
+      slash: 0.05, heavy: 0.08, quake: 0.22, whirl: 0.16, beam: 0.2 };
     const gate = gates[name] || 0;
     if (gate && this._last[name] && now - this._last[name] < gate) return;
     this._last[name] = now;
@@ -185,6 +185,11 @@ const Sfx = {
       case 'whirl':
         this.tone(300, 900, 0.30, 'sawtooth', 0.045);
         this.tone(900, 320, 0.26, 'triangle', 0.03, 0.06);
+        break;
+      case 'beam':
+        // 奥术洪流: 低频嗡鸣 + 高频泛音, 有「持续喷射」的厚度
+        this.tone(120, 230, 0.55, 'sawtooth', 0.06);
+        this.tone(620, 440, 0.42, 'triangle', 0.032, 0.02);
         break;
       case 'win':
         [523, 659, 784, 1046, 1318].forEach((f, i) => this.tone(f, f, 0.28, 'triangle', 0.1, i * 0.11));

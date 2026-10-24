@@ -53,26 +53,38 @@ console.log('\n[职业]');
     assert(g.player.skills[0].id === 'fireball', '起始技能不是火球术');
   });
 
-  check('两职业各 15 个技能，且 30 个技能都有 5 级和 4 条升级文案', () => {
+  check('两职业各 15 个技能 + 1 个独立位移技能，都有 5 级和 4 条升级文案', () => {
     const data = h.run(`(() => {
       const out = [];
+      let poolTotal = 0;
       for (const cid in CONTENT.classes) {
         const c = CONTENT.classes[cid];
+        poolTotal += c.skills.length;
         let ok = c.skills.length === 15;
-        let levels = true, ups = true, exists = true;
+        let levels = true, ups = true, exists = true, independent = false;
         for (const id of c.skills) {
           const d = CONTENT.skills[id];
           if (!d) { exists = false; continue; }
           if (d.lvl.length !== 5) levels = false;
           if (!d.up || d.up.length !== 4) ups = false;
           if (d.cls !== cid) out.push('职业标记错误 ' + id);
+          if (d.displacement) independent = true;
         }
-        out.push({ cid: cid, count: c.skills.length, ok: ok, levels: levels, ups: ups, exists: exists });
+        out.push({ cid: cid, count: c.skills.length, ok: ok, levels: levels, ups: ups, exists: exists, independent: independent });
       }
       const all = Object.keys(CONTENT.skills);
-      return { classes: out, total: all.length };
+      let extras = 0, extraBad = 0;
+      for (const id of all) {
+        const d = CONTENT.skills[id];
+        if (d.displacement && CONTENT.classes[d.cls].skills.indexOf(id) === -1) extras++;
+        if (d.lvl.length !== 5 || !d.up || d.up.length !== 4) extraBad++;
+      }
+      return { classes: out, total: all.length, poolTotal: poolTotal, extras: extras, extraBad: extraBad };
     })()`);
-    assert(data.total === 30, '技能总数不是 30: ' + data.total);
+    assert(data.poolTotal === 30, '卡池技能总数不是 30: ' + data.poolTotal);
+    assert(data.total === 31, '技能定义总数不是 31: ' + data.total);
+    assert(data.extras === 1, '独立位移技能数量不对: ' + data.extras);
+    assert(data.extraBad === 0, '有技能缺 5 级数值或升级文案');
     for (const c of data.classes) {
       assert(c.count === 15, c.cid + ' 技能数不是 15: ' + c.count);
       assert(c.ok && c.exists, c.cid + ' 技能列表有缺失');
@@ -155,7 +167,7 @@ console.log('\n[技能行为]');
     assert(out.hp < out.max, '目标没有掉血');
   });
 
-  check('投射物 / 自身 AOE / 地面 AOE / 连锁都能造成伤害', () => {
+  check('投射物 / 自身 AOE / 地面 AOE / 柱状波都能造成伤害', () => {
     const out = h.run(`(() => {
       const test = (cls, id, dx) => {
         GAME.start(cls, 'normal');
@@ -175,10 +187,217 @@ console.log('\n[技能行为]');
         projectile: test('mage', 'fireball', 180),
         pbaoe: test('warrior', 'whirlwind', 40),
         ground: test('mage', 'blizzard', 120),
-        chain: test('mage', 'arcane_torrent', 100)
+        beam: test('mage', 'arcane_torrent', 100)
       };
     })()`);
     for (const k in out) assert(out[k] > 0, k + ' 没有造成伤害');
+  });
+
+  check('法师三系各 5 个技能，闪现不占名额', () => {
+    const out = h.run(`(() => {
+      const t = CONTENT.talentTrees.mage;
+      return t.branches.map(b => ({ id: b.id, n: b.skills.length, skills: b.skills.slice() }));
+    })()`);
+    for (const b of out) assert(b.n === 5, b.id + ' 系不是 5 个技能: ' + b.n);
+    const fire = out.find(b => b.id === 'fire');
+    const frost = out.find(b => b.id === 'frost');
+    const arcane = out.find(b => b.id === 'arcane');
+    assert(fire.skills.indexOf('shockwave') >= 0, '火系缺少冲击波');
+    assert(frost.skills.indexOf('ice_block') === -1, '冰系还挂着寒冰屏障');
+    assert(arcane.skills.indexOf('arcane_field') >= 0, '奥术系缺少奥术力场');
+    assert(arcane.skills.indexOf('blink') === -1, '闪现还占奥术系名额');
+  });
+
+  check('寒冰屏障已删除，冰霜屏障保留', () => {
+    const out = h.run(`(() => {
+      const inPool = CONTENT.classes.mage.skills;
+      let treeHas = false;
+      for (const b of CONTENT.talentTrees.mage.branches) {
+        if (b.skills.indexOf('ice_block') !== -1) treeHas = true;
+        for (const n of b.nodes) {
+          const e = n.effect || {};
+          if (e.skills && e.skills.ice_block) treeHas = true;
+        }
+      }
+      return {
+        def: !!CONTENT.skills.ice_block,
+        pool: inPool.indexOf('ice_block') !== -1,
+        treeHas: treeHas,
+        barrier: !!CONTENT.skills.ice_barrier
+      };
+    })()`);
+    assert(!out.def && !out.pool && !out.treeHas, '寒冰屏障没有删干净');
+    assert(out.barrier, '冰霜屏障被误删');
+  });
+
+  check('闪现移出天赋树，但空格位移仍在且随等级成长', () => {
+    const out = h.run(`(() => {
+      const inTree = [];
+      for (const cid in CONTENT.talentTrees) {
+        for (const b of CONTENT.talentTrees[cid].branches) {
+          if (b.skills.indexOf('blink') !== -1) inTree.push(cid + '.' + b.id);
+        }
+      }
+      GAME.start('mage', 'normal');
+      const p = GAME.player;
+      const l1 = p.dispLevel();
+      p.level = 40;
+      const l5 = p.dispLevel();
+      return { inTree, has: !!CONTENT.skills.blink, l1, l5, disp: p.displacement && p.displacement.id };
+    })()`);
+    assert(out.inTree.length === 0, '闪现还挂在天赋树里: ' + out.inTree.join(','));
+    assert(out.has && out.disp === 'blink', '闪现技能被删掉了');
+    assert(out.l1 === 1 && out.l5 === 5, '闪现没有随等级 1→5 成长: ' + out.l1 + '→' + out.l5);
+  });
+
+  check('奥术洪流是穿透柱状波，只打柱体覆盖的敌人', () => {
+    const out = h.run(`(() => {
+      GAME.start('mage', 'normal');
+      const p = GAME.player;
+      p.skills.length = 0; p.addSkill('arcane_torrent'); p.skill('arcane_torrent').lvl = 5;
+      p.iframe = 999;
+      GAME.enemies.length = 0; GAME.zones.length = 0; GAME.projectiles.length = 0;
+      GAME.spawner.opened = true; GAME.spawner.spawnT = 999; GAME.spawner.eliteT = 999;
+      const line = [];
+      for (let i = 0; i < 3; i++) {
+        const e = GAME.spawnEnemy('brute', p.x + 130 + i * 90, p.y, false);
+        e.hp = e.maxHp = 99999; e.speed = 0; line.push(e);
+      }
+      const side = GAME.spawnEnemy('brute', p.x, p.y + 260, false);
+      side.hp = side.maxHp = 99999; side.speed = 0;
+      const sideHp0 = side.hp;
+      for (let i = 0; i < 200; i++) GAME.update(1 / 60);
+      return {
+        lineHit: line.filter(e => e.hp < e.maxHp).length,
+        sideHit: side.hp < sideHp0,
+        beamSeen: p.skill('arcane_torrent').beamLen > 0,
+        vfx: GAME.projectiles.length
+      };
+    })()`);
+    assert(out.lineHit === 3, '柱状波没有穿透直线上的 3 个敌人: ' + out.lineHit);
+    assert(!out.sideHit, '柱状波不应打中侧面的敌人');
+    assert(out.beamSeen, '柱状波没有记录长度');
+  });
+
+  check('奥术力场跟随玩家，并持续伤害/减速', () => {
+    const out = h.run(`(() => {
+      GAME.start('mage', 'normal');
+      const p = GAME.player;
+      p.skills.length = 0; p.addSkill('arcane_field'); p.skill('arcane_field').lvl = 5;
+      p.iframe = 999;
+      GAME.enemies.length = 0; GAME.zones.length = 0;
+      GAME.spawner.opened = true; GAME.spawner.spawnT = 999; GAME.spawner.eliteT = 999;
+      const e = GAME.spawnEnemy('brute', p.x + 60, p.y, false);
+      e.hp = e.maxHp = 99999; e.speed = 1;
+      for (let i = 0; i < 30; i++) GAME.update(1 / 60);
+      const z0 = GAME.zones.find(z => z.id === 'arcane_field');
+      const x0 = z0 ? z0.x : 0;
+      p.x += 150;
+      for (let i = 0; i < 12; i++) GAME.update(1 / 60);
+      const z1 = GAME.zones.find(z => z.id === 'arcane_field');
+      return {
+        spawned: !!z0, follow: !!(z0 && z0.follow),
+        dx: z1 ? z1.x - x0 : 0,
+        slow: e.slow > 0, hp: e.hp < e.maxHp
+      };
+    })()`);
+    assert(out.spawned && out.follow, '力场没有生成或没标记跟随');
+    assert(out.dx > 100, '力场没有跟随玩家移动: ' + out.dx);
+    assert(out.slow, '力场没有减速敌人');
+    assert(out.hp, '力场没有造成持续伤害');
+  });
+
+  check('奥术飞弹 3 秒内分多轮放出，出膛方向四散', () => {
+    const out = h.run(`(() => {
+      GAME.start('mage', 'normal');
+      const p = GAME.player;
+      p.skills.length = 0; p.addSkill('arcane_missiles'); p.skill('arcane_missiles').lvl = 5;
+      p.iframe = 999;
+      GAME.enemies.length = 0; GAME.zones.length = 0; GAME.projectiles.length = 0;
+      GAME.spawner.opened = true; GAME.spawner.spawnT = 999; GAME.spawner.eliteT = 999;
+      for (let i = 0; i < 4; i++) {
+        const e = GAME.spawnEnemy('brute', p.x + 150, p.y + (i - 1.5) * 40, false);
+        e.hp = e.maxHp = 99999; e.speed = 0;
+      }
+      const angles = [];
+      let spawned = 0;
+      const push = GAME.projectiles.push;
+      GAME.projectiles.push = function () {
+        for (let i = 0; i < arguments.length; i++) {
+          spawned++;
+          if (angles.length < 400) angles.push(Math.atan2(arguments[i].vy, arguments[i].vx));
+        }
+        return push.apply(this, arguments);
+      };
+      for (let f = 0; f < 300; f++) GAME.update(1 / 60);
+      GAME.projectiles.push = push;
+      const first = angles.slice(0, 6);
+      const spread = first.length ? Math.max(...first) - Math.min(...first) : 0;
+      const homing = angles.length ? 1 : 0;
+      return { spawned, firstN: first.length, spread, homing };
+    })()`);
+    assert(out.firstN === 6, '第一轮应有 6 枚飞弹: ' + out.firstN);
+    assert(out.spawned === 36, '5 级应放出 6 轮 × 6 枚 = 36 发: ' + out.spawned);
+    assert(out.spread > 0.8, '飞弹出膛角度没有四散: ' + out.spread);
+  });
+
+  check('冲击波击退并灼烧周围敌人', () => {
+    const out = h.run(`(() => {
+      GAME.start('mage', 'normal');
+      const p = GAME.player;
+      p.skills.length = 0; p.addSkill('shockwave'); p.skill('shockwave').lvl = 5;
+      p.iframe = 999;
+      GAME.enemies.length = 0; GAME.zones.length = 0; GAME.projectiles.length = 0;
+      GAME.spawner.opened = true; GAME.spawner.spawnT = 999; GAME.spawner.eliteT = 999;
+      const e = GAME.spawnEnemy('brute', p.x + 60, p.y, false);
+      e.hp = e.maxHp = 99999; e.speed = 0;
+      const d0 = dist(e.x, e.y, p.x, p.y);
+      let pushed = 0;
+      for (let f = 0; f < 40; f++) {
+        GAME.update(1 / 60);
+        pushed = Math.max(pushed, dist(e.x, e.y, p.x, p.y) - d0);
+      }
+      const dots = e.dots.length;
+      const hp1 = e.hp;
+      for (let f = 0; f < 90; f++) GAME.update(1 / 60);
+      return { pushed, dots, dotDmg: hp1 - e.hp };
+    })()`);
+    assert(out.pushed > 80, '冲击波没有击退: ' + out.pushed);
+    assert(out.dots > 0, '冲击波没有挂上灼烧');
+    assert(out.dotDmg > 0, '灼烧没有持续掉血');
+  });
+
+  check('霜噬节点：对减速目标增伤', () => {
+    const out = h.run(`(() => {
+      GAME.start('mage', 'normal');
+      const meta = Talents.bonuses('mage', { 'frost.synergy': 3 });
+      const p = new Player(100, 100, 'mage', 1, meta);
+      GAME.player = p;
+      GAME.enemies.length = 0;
+      const e = GAME.spawnEnemy('brute', 200, 100, false);
+      e.hp = e.maxHp = 1000; e.slow = 0.5; e.slowT = 5;
+      damageEnemy(GAME, e, 100, { quiet: true, silent: true });
+      const slowedDmg = 1000 - e.hp;
+      e.hp = 1000; e.slow = 0; e.slowT = 0;
+      damageEnemy(GAME, e, 100, { quiet: true, silent: true });
+      const plainDmg = 1000 - e.hp;
+      return { vs: p.vsSlowed, slowedDmg, plainDmg };
+    })()`);
+    assert(out.vs > 0, '霜噬没有聚合出 vsSlowed');
+    assert(out.slowedDmg > out.plainDmg, '对减速目标没有增伤');
+  });
+
+  check('跨技能节点同时强化两个技能', () => {
+    const out = h.run(`(() => {
+      const meta = Talents.bonuses('mage', { 'fire.synergy': 3 });
+      const node = Talents.node('mage', 'fire.synergy');
+      const a = meta.skills.fireball || {};
+      const b = meta.skills.pyroblast || {};
+      return { has: !!node, type: node && node.type, aDmg: a.dmg || 0, bDmg: b.dmg || 0, cd: a.cd || 0 };
+    })()`);
+    assert(out.has && out.type === 'skill', '跨技能节点缺失或类型不对');
+    assert(out.aDmg > 0 && out.bDmg > 0, '跨技能节点没有同时强化两个技能');
+    assert(out.cd < 0, '跨技能节点没有给冷却');
   });
 
   check('增益 / 护盾 / 无敌生效', () => {
@@ -1091,7 +1310,7 @@ console.log('\n[天赋树与三槽存档]');
 {
   const h = createHarness();
 
-  check('两职业各有 3 分支 × 10 节点，满级 84 级', () => {
+  check('两职业各有 3 分支 × 11 节点，满级 93 级', () => {
     const info = h.run(`(() => {
       const out = {};
       for (const cid of ['warrior', 'mage']) {
@@ -1109,10 +1328,10 @@ console.log('\n[天赋树与三槽存档]');
     })()`);
     for (const cid of ['warrior', 'mage']) {
       assert(info[cid].branches === 3, cid + ' 分支数不是 3');
-      assert(info[cid].nodes === 30, cid + ' 节点数不是 30: ' + info[cid].nodes);
-      assert(info[cid].perBranch.every(n => n === 10), cid + ' 每分支不是 10 节点');
-      assert(info[cid].skillNodes.every(n => n === 5), cid + ' 每分支技能节点不是 5');
-      assert(info[cid].max === 84, cid + ' 满级不是 84: ' + info[cid].max);
+      assert(info[cid].nodes === 33, cid + ' 节点数不是 33: ' + info[cid].nodes);
+      assert(info[cid].perBranch.every(n => n === 11), cid + ' 每分支不是 11 节点');
+      assert(info[cid].skillNodes.every(n => n === 6), cid + ' 每分支技能节点不是 6（5 技能 + 1 跨技能）');
+      assert(info[cid].max === 93, cid + ' 满级不是 93: ' + info[cid].max);
     }
   });
 
@@ -1130,6 +1349,39 @@ console.log('\n[天赋树与三槽存档]');
       return out;
     })()`);
     assert(bad.length === 0, '前置错误: ' + bad.join(', '));
+  });
+
+  check('11 节点布局在 720p / 1080p 下不重叠、不出界', () => {
+    const h2 = createHarness();
+    const g2 = h2.game;
+    g2.openSlot(0);
+    g2.selectedClass = 'mage';
+    g2.finishCreateSlot(1);
+    const out = h2.run(`(() => {
+      const rows = [];
+      const sizes = [[1280, 720], [1920, 1080], [1024, 768]];
+      for (const sz of sizes) {
+        GAME.view = { w: sz[0], h: sz[1], dpr: 1 };
+        const L = UI.talentLayout(GAME);
+        const nr = UI.talentNodeR(GAME);
+        let minD = 1e9, minPair = '';
+        for (let i = 0; i < L.length; i++) {
+          for (let j = i + 1; j < L.length; j++) {
+            const d = Math.hypot(L[i].x - L[j].x, L[i].y - L[j].y);
+            if (d < minD) { minD = d; minPair = L[i].node.id + '/' + L[j].node.id; }
+          }
+        }
+        const inside = L.every(p => p.x > 8 && p.x < sz[0] - 8 && p.y > 52 && p.y < sz[1] - 52);
+        rows.push({ w: sz[0], h: sz[1], nodes: L.length, minD: Math.round(minD),
+          tile: Math.round(nr * 1.92), inside: inside, pair: minPair });
+      }
+      return rows;
+    })()`);
+    for (const r of out) {
+      assert(r.nodes === 33, r.w + 'x' + r.h + ' 节点数不是 33');
+      assert(r.inside, r.w + 'x' + r.h + ' 有节点超出画面');
+      assert(r.minD > r.tile, r.w + 'x' + r.h + ' 节点重叠: ' + r.pair + ' 距离 ' + r.minD + ' < ' + r.tile);
+    }
   });
 
   check('金币不足 / 前置不足 / 满级都会拒绝购买', () => {
@@ -1673,11 +1925,11 @@ console.log('\n[朝向图集]');
     }
   });
 
-  check('龙息龙首走程序化火焰画法，不依赖外部贴图', () => {
+  check('龙息无贴图时回退程序化龙首，不报错且回收', () => {
     const out = h.run(`(() => {
       let touched = 0;
       const origEntry = (typeof Assets !== 'undefined') ? Assets.entry : null;
-      if (origEntry) Assets.entry = () => { touched++; return null; };
+      if (origEntry) Assets.entry = () => { touched++; return null; };   // 模拟无贴图: 探一次, 始终回退程序化
       VFX.reset();
       VFX.breath(100, 100, 0.4, 220, 1.5, 'dragon', '#ff9f43');
       const types = VFX.items.map(i => i.type);
@@ -1686,8 +1938,68 @@ console.log('\n[朝向图集]');
       return { touched, types, items: VFX.items.length };
     })()`);
     assert(out.types.indexOf('breath') >= 0, '龙息没有生成火焰层');
-    assert(out.touched === 0, '龙首不该再去读外部贴图: ' + out.touched);
     assert(out.items === 0, '龙息特效没有回收');
+  });
+
+  check('所有贴图分支都能绘制（有图时不报错）', () => {
+    const out = h.run(`(() => {
+      const errs = [];
+      const keys = Object.keys(CONTENT.assets.fx);
+      for (const k of keys) {
+        Assets.map['fx:' + k] = { src: k, ready: true, failed: false, frames: 1, img: { width: 512, height: 512 } };
+      }
+      const ctx = GAME.ctx;
+      const tryRun = (label, fn) => { try { fn(); } catch (e) { errs.push(label + ': ' + (e.stack || e)); } };
+      VFX.reset();
+
+      tryRun('proj', () => {
+        for (const style of ['fire', 'pyro', 'ice', 'arcane', 'dragon']) {
+          const pr = new Projectile({ x: 120, y: 90, vx: 200, vy: 40, r: 8, dmg: 1, life: 1, style, type: 'bolt', art: style });
+          pr.age = 0.2;
+          VFX.drawProjectile(ctx, pr);
+        }
+      });
+
+      tryRun('impact', () => {
+        VFX.impact(100, 100, 'ice', '#74c0fc');
+        for (let i = 0; i < 12; i++) { VFX.update(1 / 60); VFX.draw(ctx, 'over'); }
+      });
+
+      tryRun('burst', () => {
+        VFX.burst(100, 100, 90, 'fire', '#ff9f43', {});
+        VFX.burst(100, 100, 90, 'pyro', '#ff9f43', {});
+        VFX.burst(100, 100, 90, 'fire', '#ff9f43', { art: 'flamestrike' });
+        VFX.burst(100, 100, 90, 'ice', '#74c0fc', { art: 'frost_nova' });
+        for (let i = 0; i < 40; i++) { VFX.update(1 / 60); VFX.draw(ctx, 'over'); }
+      });
+
+      tryRun('breath', () => {
+        VFX.breath(100, 100, 0.2, 220, 1.4, 'dragon', '#ff9f43');
+        for (let i = 0; i < 40; i++) { VFX.update(1 / 60); VFX.draw(ctx, 'over'); VFX.draw(ctx, 'ground'); }
+      });
+
+      tryRun('zones', () => {
+        const zs = [
+          new Zone({ x: 100, y: 100, r: 120, kind: 'field', duration: 3, tick: 0.5, dps: 10, slow: 0.3, slowT: 0.5, art: 'blizzard', style: 'ice', id: 'blizzard' }),
+          new Zone({ x: 100, y: 100, r: 120, kind: 'field', duration: 3, tick: 0.5, dps: 10, art: 'arcane_field', style: 'arcane', id: 'arcane_field', follow: true }),
+          new Zone({ x: 100, y: 100, r: 120, kind: 'burst', delay: 5, dmg: 10, art: 'flamestrike', style: 'fire', id: 'flamestrike' })
+        ];
+        for (const z of zs) {
+          VFX.drawZone(ctx, z);
+          for (let i = 0; i < 20; i++) VFX.update(1 / 60);
+          VFX.drawZone(ctx, z);
+        }
+      });
+
+      tryRun('beam', () => {
+        VFX.beam(100, 100, 0.3, 300, 60, 'arcane', '#b197fc', { life: 2 });
+        for (let i = 0; i < 20; i++) { VFX.update(1 / 60); VFX.draw(ctx, 'over'); }
+      });
+
+      return { errs, keys: keys.length };
+    })()`);
+    assert(out.keys === 13, 'fx 贴图注册数量不是 13: ' + out.keys);
+    assert(out.errs.length === 0, '贴图分支报错: ' + out.errs.join(' | '));
   });
 
   check('四个形象都有四方向图集', () => {

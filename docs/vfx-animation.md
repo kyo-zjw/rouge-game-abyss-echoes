@@ -84,6 +84,7 @@ CONTENT.skillFx = {
 | `VFX.pulse(x,y,r,style,color,opt)` | 奥爆：能量力场 —— 球体膨胀 + 六边形网格 + 符文环 + 外壳亮环 + 碎片 |
 | `VFX.slam(x,y,r,style,color,opt)` | 裂地：地面裂纹（带分叉）+ 碎石 + 冲击环 + 尘土，踩地板 / 重击落点 |
 | `VFX.spin(x,y,r,style,color,opt)` | 旋风：地面风环 + 三段螺旋气流 + 环绕刀光 + 内吸碎屑 |
+| `VFX.beam(x,y,angle,len,width,style,color,opt)` | 柱状能量波（奥术洪流）：白热芯 + 主色束 + 滚动能量环 + 边缘电弧 + 端头光斑；`follow` 把起点贴到玩家身上，`owner` 让宽度 / 方向跟着技能状态走 |
 | `VFX.shock(x,y,r,style,color,opt)` | 地面冲击环 |
 | `VFX.cast(x,y,r,style,color,opt)` | 施法/预警法阵 |
 | `VFX.aura(x,y,r,style,color,opt)` | 增益光柱 |
@@ -91,7 +92,7 @@ CONTENT.skillFx = {
 | `VFX.impact(x,y,style,color,opt)` | 小命中火花 |
 | `VFX.dust(x,y,style,color,opt)` | 脚步/冲锋尘土 |
 | `VFX.drawProjectile(ctx, pr)` | 飞行弹体（火球、冰箭、奥术飞弹、龙息弹、敌方暗影弹） |
-| `VFX.drawZone(ctx, z)` | 地面区域（暴风雪、烈焰风暴、毒云、陨石） |
+| `VFX.drawZone(ctx, z)` | 地面区域（暴风雪、烈焰风暴、毒云、陨石、奥术力场 `arcane_field`） |
 | `VFX.drawPlayerCast(ctx, p, g)` | 玩家施法/引导的持续演出 |
 
 **打击感**（战士向）：

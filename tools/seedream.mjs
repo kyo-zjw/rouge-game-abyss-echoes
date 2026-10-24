@@ -53,6 +53,10 @@ const DEFAULTS = {
 
 const PRESET_TARGET = { player: 256, enemy: 64, boss: 192, icon: 128 };
 
+// Agent Plan 订阅端点: 用同一把 plan key 就能出图, 模型 id 是点号版本
+const PLAN_BASE = 'https://ark.cn-beijing.volces.com/api/plan/v3';
+const PLAN_MODEL = 'doubao-seedream-5.0-flash';
+
 /* ------------------------------------------------------------------ utils */
 
 function readJson(file, fallback) {
@@ -169,6 +173,7 @@ function loadSettings(args) {
     : dotenv.VOLCENGINE_API_KEY ? 'project .env VOLCENGINE_API_KEY'
     : userConfig.apiKey ? '~/.dsh/seedream.json'
     : '';
+  let planMode = false;
 
   if (!apiKey) {
     const fromDsh = readDshCredential('VOLCENGINE_API_KEY');
@@ -178,8 +183,21 @@ function loadSettings(args) {
     }
   }
 
-  const model = args.model || env.ARK_IMAGE_MODEL || userConfig.model || fileConfig.model;
-  const baseURL = (args['base-url'] || userConfig.baseURL || fileConfig.baseURL).replace(/\/+$/, '');
+  // Agent Plan 订阅里的 seedream: 同一把 plan key 走 /api/plan/v3, 不需要额外开通图片 API。
+  if (!apiKey) {
+    const planKey = readDshCredential('ARKCLI_AGENT_PLAN_API_KEY');
+    if (planKey) {
+      apiKey = planKey;
+      keySource = 'DSH Agent Plan (ARKCLI_AGENT_PLAN_API_KEY)';
+      planMode = true;
+    }
+  }
+
+  let model = args.model || env.ARK_IMAGE_MODEL || userConfig.model || fileConfig.model;
+  let baseURL = (args['base-url'] || userConfig.baseURL || fileConfig.baseURL).replace(/\/+$/, '');
+  // plan 模式: 没显式指定时切到 plan 端点 + plan 里的模型 id(点号版本)
+  if (planMode && !args.model && !env.ARK_IMAGE_MODEL && !userConfig.model) model = PLAN_MODEL;
+  if (planMode && !args['base-url'] && !userConfig.baseURL) baseURL = PLAN_BASE;
   const size = args.size || userConfig.size || fileConfig.size;
   const outputFormat = args['output-format'] || userConfig.outputFormat || fileConfig.outputFormat;
   const watermark = toBool(args.watermark, userConfig.watermark ?? fileConfig.watermark);
@@ -189,7 +207,7 @@ function loadSettings(args) {
   const python = args.python || userConfig.python || fileConfig.python || '';
 
   return {
-    apiKey, keySource, model, baseURL, size, outputFormat, watermark,
+    apiKey, keySource, planMode, model, baseURL, size, outputFormat, watermark,
     concurrency, retries, requestTimeoutMs, python, fileConfig, userConfig
   };
 }
@@ -469,6 +487,7 @@ function cmdDoctor(args) {
   console.log('  model        :', settings.model);
   console.log('  api key      :', settings.apiKey ? maskKey(settings.apiKey) : '(NOT FOUND)');
   console.log('  key source   :', settings.keySource || '(none)');
+  console.log('  plan mode    :', settings.planMode ? 'yes (Agent Plan 订阅)' : 'no');
   console.log('  default size :', settings.size, '/', settings.outputFormat);
   console.log('  python       :', python);
   console.log('  prompts      :', prompts.assets.length, `(${missing.length} missing, ${prompts.assets.length - missing.length} present)`);

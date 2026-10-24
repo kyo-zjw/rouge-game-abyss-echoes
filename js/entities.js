@@ -76,6 +76,12 @@ class Player {
     this.invuln = 0;
     this.damageDealt = 0;
 
+    // 引导类技能(奥术洪流)的自身减速: 由技能每帧写入, 带 0.12s 余量自动失效
+    this.selfSlow = 0;
+    this.selfSlowT = 0;
+    // 冰系天赋「霜噬」: 对减速目标的额外伤害倍率
+    this.vsSlowed = 0;
+
     // 独立位移技能: 空格触发, 2 层充能, 每层独立冷却
     const dispId = def.displacement || null;
     this.displacement = dispId ? {
@@ -153,6 +159,7 @@ class Player {
     this.armor = def.armor;
     this.magnet = def.magnet || 130;
     this.regen = 0;
+    this.vsSlowed = 0;
 
     for (const id in this.passives) {
       const pdef = CONTENT.passives[id];
@@ -179,6 +186,7 @@ class Player {
       if (m.xpPct) this.xpMul += m.xpPct;
       if (m.magnetAdd) this.magnet += m.magnetAdd;
       if (m.regenAdd) this.regen += m.regenAdd;
+      if (m.vsSlowed) this.vsSlowed = m.vsSlowed;
     }
 
     const gained = this.maxHp - oldMax;
@@ -203,8 +211,9 @@ class Player {
     if (dashing) {
       this.stepDash(dt, g);
     } else {
-      this.x += a.x * this.speed * dt;
-      this.y += a.y * this.speed * dt;
+      const slowK = this.selfSlowT > 0 ? 1 - clamp(this.selfSlow, 0, 0.8) : 1;
+      this.x += a.x * this.speed * slowK * dt;
+      this.y += a.y * this.speed * slowK * dt;
     }
 
     const W = CONTENT.world;
@@ -243,6 +252,10 @@ class Player {
     if (this.iframe > 0) this.iframe -= dt;
     if (this.flash > 0) this.flash -= dt;
     if (this.invuln > 0) this.invuln -= dt;
+    if (this.selfSlowT > 0) {
+      this.selfSlowT -= dt;
+      if (this.selfSlowT <= 0) this.selfSlow = 0;
+    }
 
     let expired = false;
     for (const id in this.buffs) {
@@ -995,6 +1008,7 @@ class Projectile {
     this.type = o.type || 'bolt';
     this.art = o.art || '';          // 技能 id / 弹体美术 key
     this.style = o.style || '';      // fire / ice / arcane / shadow / ...
+    this.dot = o.dot || null;        // 命中爆炸附加的持续伤害(炎爆灼烧)
     this.age = 0;
   }
 
@@ -1107,6 +1121,7 @@ class Zone {
     this.style = o.style || '';      // fire / ice / poison / ...
     this.seed = Math.random() * 100;
     this.hostile = !!o.hostile;
+    this.follow = !!o.follow;      // 跟随玩家移动的力场(奥术力场)
     this.t = 0;
     this.tickT = this.hostile ? this.tick : 0;
     this.burstDone = false;
@@ -1115,6 +1130,10 @@ class Zone {
 
   update(dt, g) {
     this.t += dt;
+    if (this.follow && g.player && g.player.alive) {
+      this.x = g.player.x;
+      this.y = g.player.y;
+    }
 
     if (this.kind === 'burst') {
       if (!this.burstDone && this.t >= this.delay) {
@@ -1123,7 +1142,7 @@ class Zone {
         const fx = this.style || 'fire';
         const heavy = this.r >= 95 || this.hostile;
         VFX.burst(this.x, this.y, this.r, fx, this.color, {
-          heavy, life: heavy ? 0.72 : 0.55
+          heavy, life: this.art === 'flamestrike' ? 1.4 : (heavy ? 0.72 : 0.55), art: this.art
         });
         VFX.shock(this.x, this.y, this.r * 0.9, fx, this.color, { heavy });
         FX.spark(this.x, this.y, this.color, 20, 260, 0.55);

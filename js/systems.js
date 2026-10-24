@@ -26,6 +26,7 @@ function skillStats(p, def, w) {
 
   if (mod.duration && base.duration !== undefined) out.duration = base.duration * (1 + mod.duration);
   if (mod.shield && base.shield !== undefined) out.shield = base.shield * (1 + mod.shield);
+  if (mod.width && base.width !== undefined) out.width = base.width * (1 + mod.width);
 
   if (mod.buff) {
     if (base.dmgMul !== undefined) out.dmgMul = base.dmgMul * (1 + mod.buff);
@@ -59,6 +60,15 @@ function angDiff(a, b) {
   while (d > Math.PI) d -= TAU;
   while (d < -Math.PI) d += TAU;
   return d;
+}
+
+/* 点到线段的距离: 柱状能量波做命中判定用 */
+function distToSegment(px, py, x1, y1, x2, y2) {
+  const dx = x2 - x1, dy = y2 - y1;
+  const l2 = dx * dx + dy * dy;
+  let t = l2 > 0 ? ((px - x1) * dx + (py - y1) * dy) / l2 : 0;
+  t = clamp(t, 0, 1);
+  return Math.hypot(px - (x1 + dx * t), py - (y1 + dy * t));
 }
 
 function startCd(w, s, p) {
@@ -168,7 +178,7 @@ const SKILL_BEHAVIORS = {
         if (w.id === 'dragon_breath') {
           // 视觉范围比命中范围大一圈, 看起来更有压迫感
           VFX.breath(p.x, p.y, base, range * 1.38, (s.arc || 1.4) * 1.08, fx, def.color, {
-            life: 0.82, groundLife: 1.15
+            life: 2.4, groundLife: 2.2, follow: p
           });
           VFX.shock(p.x + Math.cos(base) * 26, p.y + Math.sin(base) * 26,
             range * 0.52, 'dragon', def.color, { life: 0.42, heavy: true });
@@ -224,9 +234,13 @@ const SKILL_BEHAVIORS = {
     }
   },
 
-  /* 投射物, 可多发/追踪/爆炸/减速 */
+  /* 投射物, 可多发/追踪/爆炸/减速。
+     带 volleys 的技能(奥术飞弹)走「齐射窗口」: 每 interval 秒放一轮,
+     全部放完才开始算冷却, 避免两个窗口叠在一起。 */
   projectile: {
     tick(g, w, s, p, dt) {
+      if (s.volleys && s.volleys > 1) { this.volley(g, w, s, p, dt); return; }
+
       w.t -= dt;
       if (w.t > 0) return;
       const range = s.range * p.areaMul;
@@ -234,41 +248,98 @@ const SKILL_BEHAVIORS = {
       if (!tgt) return;
       startCd(w, s, p);
 
-      const count = s.count || 1;
       const def = CONTENT.skills[w.id] || {};
       const fx = def.fx || (s.aoe ? 'fire' : 'bolt');
       const base = angTo(p.x, p.y, tgt.x, tgt.y);
       const spread = s.spread || 0.1;
       p.triggerAttack('cast', base, w.id, { style: fx });
       VFX.cast(p.x, p.y, p.r * 2.1, fx, def.color, { life: 0.34 });
-      for (let i = 0; i < count; i++) {
-        const a = base + (i - (count - 1) / 2) * spread + rnd(0.03, -0.03);
-        const sx = p.x + Math.cos(a) * (p.r + 8);
-        const sy = p.y + Math.sin(a) * (p.r + 8);
-        g.projectiles.push(new Projectile({
-          x: sx,
-          y: sy,
-          vx: Math.cos(a) * s.speed,
-          vy: Math.sin(a) * s.speed,
-          r: s.size || 6,
-          dmg: s.dmg,
-          pierce: s.pierce || 0,
-          life: range / s.speed,
-          color: s.color,
-          aoe: (s.aoe || 0) * p.areaMul,
-          homing: s.homing || 0,
-          speed: s.speed,
-          target: tgt,
-          slow: s.slow || 0,
-          slowT: s.slowT || 0,
-          type: s.aoe ? 'fireball' : 'bolt',
-          art: w.id,
-          style: fx
-        }));
-        VFX.impact(sx, sy, fx, def.color, { life: 0.14 });
-      }
+      this.fire(g, w, s, p, base, tgt, spread);
       g.cam.shake = Math.min(12, g.cam.shake + (s.aoe && s.aoe > 75 ? 2.2 : 0.3));
       Sfx.play('shoot');
+    },
+
+    volley(g, w, s, p, dt) {
+      const def = CONTENT.skills[w.id] || {};
+      const fx = def.fx || 'arcane';
+
+      // 窗口进行中: 按 interval 放下一轮
+      if (w.volleyLeft > 0) {
+        w.volleyT -= dt;
+        if (w.volleyT > 0) return;
+        this.fireVolley(g, w, s, p);
+        w.volleyLeft--;
+        w.volleyT = s.interval || 0.5;
+        if (w.volleyLeft <= 0) startCd(w, s, p);
+        return;
+      }
+
+      w.t -= dt;
+      if (w.t > 0) return;
+      const range = s.range * p.areaMul;
+      const tgt = g.nearestTarget(p.x, p.y, range);
+      if (!tgt) return;
+      w.volleyLeft = s.volleys;
+      w.volleyT = 0;
+      p.triggerAttack('cast', angTo(p.x, p.y, tgt.x, tgt.y), w.id, { style: fx, dur: 0.42 });
+      VFX.cast(p.x, p.y, p.r * 2.2, fx, def.color, { life: 0.4 });
+      Sfx.play('shoot');
+    },
+
+    /* 单发 / 扇形齐射 */
+    fire(g, w, s, p, base, tgt, spread) {
+      const count = s.count || 1;
+      const def = CONTENT.skills[w.id] || {};
+      const fx = def.fx || (s.aoe ? 'fire' : 'bolt');
+      for (let i = 0; i < count; i++) {
+        const a = base + (i - (count - 1) / 2) * spread + rnd(0.03, -0.03);
+        this.spawn(g, w, s, p, a, tgt);
+        VFX.impact(p.x + Math.cos(a) * (p.r + 8), p.y + Math.sin(a) * (p.r + 8),
+          fx, def.color, { life: 0.14 });
+      }
+    },
+
+    /* 多轮飞弹: 每枚随机四散, 各自分配射程内的目标, 靠 homing 拐回来 */
+    fireVolley(g, w, s, p) {
+      const def = CONTENT.skills[w.id] || {};
+      const fx = def.fx || 'arcane';
+      const count = s.count || 1;
+      const scatter = s.scatter !== undefined ? s.scatter : 1.0;
+      const cand = g.nearestEnemies(p.x, p.y, s.range * p.areaMul, Math.max(8, count * 3));
+      for (let i = 0; i < count; i++) {
+        const tgt = cand.length ? cand[Math.floor(RNG() * cand.length)] : null;
+        const aim = tgt ? angTo(p.x, p.y, tgt.x, tgt.y) : rnd(TAU);
+        this.spawn(g, w, s, p, aim + rnd(scatter, -scatter), tgt);
+      }
+      VFX.cast(p.x, p.y, p.r * 1.5, fx, def.color, { life: 0.22 });
+    },
+
+    spawn(g, w, s, p, a, tgt) {
+      const def = CONTENT.skills[w.id] || {};
+      const fx = def.fx || (s.aoe ? 'fire' : 'bolt');
+      const sx = p.x + Math.cos(a) * (p.r + 8);
+      const sy = p.y + Math.sin(a) * (p.r + 8);
+      g.projectiles.push(new Projectile({
+        x: sx,
+        y: sy,
+        vx: Math.cos(a) * s.speed,
+        vy: Math.sin(a) * s.speed,
+        r: s.size || 6,
+        dmg: s.dmg,
+        pierce: s.pierce || 0,
+        life: s.range * p.areaMul / s.speed,
+        color: s.color,
+        aoe: (s.aoe || 0) * p.areaMul,
+        homing: s.homing || 0,
+        speed: s.speed,
+        target: tgt || null,
+        slow: s.slow || 0,
+        slowT: s.slowT || 0,
+        type: s.aoe ? 'fireball' : 'bolt',
+        art: w.id,
+        style: fx,
+        dot: s.dot || null
+      }));
     }
   },
 
@@ -303,7 +374,9 @@ const SKILL_BEHAVIORS = {
       } else {
         VFX.burst(p.x, p.y, radius, fx, def.color, {
           heavy: radius >= 150 || w.id === 'thunder_clap',
-          life: w.id === 'thunder_clap' ? 0.62 : 0.52
+          life: w.id === 'thunder_clap' ? 0.62 : 0.52,
+          // 冰霜新星有独立贴图, 由贴图主导形态(无图自动回退程序化冰刺)
+          art: w.id === 'frost_nova' ? 'frost_nova' : ''
         });
       }
       VFX.shock(p.x, p.y, radius * 0.9, fx, def.color, { heavy: radius >= 150 });
@@ -328,6 +401,13 @@ const SKILL_BEHAVIORS = {
       }
       if (w.id === 'frost_nova') {
         VFX.cast(p.x, p.y, radius * 0.8, 'ice', def.color, { life: 0.55 });
+      }
+      if (w.id === 'shockwave') {
+        // 冲击波: 向外推的冲击环 + 掀起的尘土, 配合击退
+        VFX.shock(p.x, p.y, radius * 1.24, 'fire', def.color, { heavy: true, life: 0.5 });
+        VFX.dust(p.x, p.y, 'fire', def.color, { life: 0.6 });
+        g.cam.shake = Math.min(22, g.cam.shake + 7);
+        g.freeze(0.07);
       }
       g.cam.shake = Math.min(16, g.cam.shake + (radius >= 150 ? 3 : 1));
       if (spin) Sfx.play('whirl');
@@ -367,6 +447,107 @@ const SKILL_BEHAVIORS = {
         }));
       }
       Sfx.play('shoot');
+    }
+  },
+
+  /* 柱状能量波: 施放时锁定方向, 引导期间可移动但自身减速; 穿透沿途所有敌人 */
+  beam: {
+    tick(g, w, s, p, dt) {
+      const def = CONTENT.skills[w.id] || {};
+      const fx = def.fx || 'arcane';
+
+      // 引导中
+      if (w.beamT > 0) {
+        w.beamT -= dt;
+        if (p.alive) {
+          p.selfSlow = s.slowSelf || 0;
+          p.selfSlowT = 0.12;
+        }
+        w.beamTick -= dt;
+        if (w.beamTick <= 0) {
+          w.beamTick += s.tick;
+          this.hitLine(g, w, s, p, def);
+        }
+        if (w.beamT <= 0) {
+          w.beamT = 0;
+          p.selfSlow = 0;
+          p.selfSlowT = 0;
+        }
+        return;
+      }
+
+      w.t -= dt;
+      if (w.t > 0) return;
+      const len = s.length * p.areaMul;
+      const tgt = g.nearestTarget(p.x, p.y, len);
+      if (!tgt) return;
+
+      startCd(w, s, p);
+      w.beamA = angTo(p.x, p.y, tgt.x, tgt.y);
+      w.beamLen = len;
+      w.beamW = (s.width || 46) * p.areaMul;
+      w.beamT = s.duration;
+      w.beamTick = 0;
+
+      // 演出对象绑定到玩家: 玩家走位时柱子跟着平移, 方向保持锁定
+      VFX.beam(p.x, p.y, w.beamA, w.beamLen, w.beamW, fx, def.color, {
+        life: s.duration, follow: p, owner: w
+      });
+      p.triggerAttack('cast', w.beamA, w.id, { style: fx, dur: 0.44 });
+      VFX.cast(p.x + Math.cos(w.beamA) * p.r, p.y + Math.sin(w.beamA) * p.r,
+        p.r * 1.6, fx, def.color, { life: 0.3 });
+      g.cam.shake = Math.min(14, g.cam.shake + 2.4);
+      Sfx.play('beam');
+    },
+
+    hitLine(g, w, s, p, def) {
+      const a = w.beamA;
+      const len = w.beamLen || (s.length * p.areaMul);
+      const halfW = (w.beamW || s.width || 46) * 0.5;
+      const ex = p.x + Math.cos(a) * len;
+      const ey = p.y + Math.sin(a) * len;
+      const list = g.enemies;
+      let hits = 0;
+      for (let i = 0; i < list.length; i++) {
+        const e = list[i];
+        if (e.dead) continue;
+        if (distToSegment(e.x, e.y, p.x, p.y, ex, ey) > halfW + e.r) continue;
+        damageEnemy(g, e, s.dmg, { quiet: true, silent: true, color: s.color });
+        hits++;
+        if (hits <= 3) VFX.impact(e.x, e.y, def.fx || 'arcane', def.color, { life: 0.12 });
+      }
+      if (hits) FX.ring(ex, ey, 12, def.color || '#b197fc', 0.18);
+    }
+  },
+
+  /* 跟随玩家的力场: 长持续 / 低 DPS / 强减速, 和暴风雪(远程投放)分工 */
+  field: {
+    tick(g, w, s, p, dt) {
+      w.t -= dt;
+      if (w.t > 0) return;
+
+      // 同类力场已经在场上就不再叠
+      for (let i = 0; i < g.zones.length; i++) {
+        const z = g.zones[i];
+        if (!z.dead && z.id === w.id) return;
+      }
+
+      const radius = s.radius * p.areaMul;
+      if (!g.nearestEnemy(p.x, p.y, radius + 120)) return;
+      startCd(w, s, p);
+
+      const def = CONTENT.skills[w.id] || {};
+      const fx = def.fx || 'arcane';
+      g.zones.push(new Zone({
+        x: p.x, y: p.y, r: radius, kind: 'field', follow: true,
+        duration: s.duration, tick: s.tick, dps: s.dps,
+        slow: s.slow, slowT: s.slowT, color: s.color, id: w.id,
+        art: w.id, style: fx
+      }));
+      p.triggerAttack('cast', null, w.id, { style: fx, dur: 0.5 });
+      VFX.cast(p.x, p.y, radius * 0.72, fx, def.color, { life: 0.6 });
+      VFX.pulse(p.x, p.y, radius, fx, def.color, { life: 0.7 });
+      Sfx.play('level');
     }
   },
 
@@ -526,6 +707,8 @@ function damageEnemy(g, e, dmg, opt) {
   }
   if (opt.crit) real *= opt.crit;
   if (e.vuln > 0) real *= 1 + e.vuln;
+  // 冰系跨技能节点「霜噬」: 对减速目标增伤, 把重复的减速变成协同
+  if (p.vsSlowed > 0 && e.slow > 0) real *= 1 + p.vsSlowed;
 
   e.hp -= real;
   e.flash = 0.1;
@@ -614,6 +797,7 @@ function explode(g, pr) {
     if (e.dead) continue;
     if (dist2(pr.x, pr.y, e.x, e.y) > (pr.aoe + e.r) * (pr.aoe + e.r)) continue;
     damageEnemy(g, e, pr.dmg * 0.85, { quiet: true, color: pr.color });
+    if (pr.dot) applyDot(e, pr.dot, pr.art || 'pyroblast', pr.color);
   }
 }
 

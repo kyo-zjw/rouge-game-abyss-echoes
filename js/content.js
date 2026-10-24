@@ -21,7 +21,11 @@ function autoUp(def) {
     add('范围', p.range, n.range, (a, b) => delta(a, b, ''));
     add('半径', p.radius, n.radius, (a, b) => delta(a, b, ''));
     add('弹数', p.count, n.count, (a, b) => '+' + (b - a));
+    add('轮次', p.volleys, n.volleys, (a, b) => '+' + (b - a));
     add('连锁', p.chains, n.chains, (a, b) => '+' + (b - a));
+    add('宽度', p.width, n.width, (a, b) => delta(a, b, ''));
+    add('长度', p.length, n.length, (a, b) => delta(a, b, ''));
+    add('击退', p.knock, n.knock, (a, b) => '+' + Math.round(b - a));
     add('护盾', p.shield, n.shield, (a, b) => '+' + (b - a));
     add('减速', p.slow, n.slow, (a, b) => Math.round(b * 100) + '%');
     add('持续时间', p.duration, n.duration, (a, b) => b.toFixed(1) + 's');
@@ -37,7 +41,7 @@ function autoUp(def) {
 const CONTENT = {
   title: '深渊回响',
   subtitle: 'ECHOES OF THE ABYSS',
-  version: '0.7.0',
+  version: '0.9.0',
 
   world: { w: 2800, h: 2000 },   // 竞技场尺寸(世界坐标)
   runLength: 600,                // 秒: 一局目标时长
@@ -103,10 +107,12 @@ const CONTENT = {
       startSkill: 'fireball',
       displacement: 'blink',
       skins: ['mage_1', 'mage_2'],
+      // 三系各 5 个（火 / 冰 / 奥），共 15 个进入升级卡池；
+      // 空格闪现是独立位移技能，不占技能格、不进卡池（见 displacement）。
       skills: [
-        'fireball', 'frostbolt', 'arcane_missiles', 'frost_nova', 'blink',
-        'ice_barrier', 'arcane_explosion', 'pyroblast', 'blizzard', 'flamestrike',
-        'arcane_power', 'ice_block', 'dragon_breath', 'cone_of_cold', 'arcane_torrent'
+        'fireball', 'pyroblast', 'flamestrike', 'dragon_breath', 'shockwave',
+        'frostbolt', 'frost_nova', 'ice_barrier', 'blizzard', 'cone_of_cold',
+        'arcane_missiles', 'arcane_explosion', 'arcane_power', 'arcane_torrent', 'arcane_field'
       ]
     }
   },
@@ -321,11 +327,11 @@ const CONTENT = {
       desc: '射出火球，命中后小范围爆炸。',
       behavior: 'projectile',
       lvl: [
-        { cd: 1.50, dmg: 30, count: 1, speed: 420, range: 420, aoe: 55, size: 6 },
-        { cd: 1.38, dmg: 43, count: 1, speed: 435, range: 435, aoe: 63, size: 6 },
-        { cd: 1.25, dmg: 56, count: 1, speed: 450, range: 450, aoe: 70, size: 7 },
-        { cd: 1.13, dmg: 69, count: 1, speed: 465, range: 465, aoe: 78, size: 7 },
-        { cd: 1.00, dmg: 82, count: 1, speed: 480, range: 480, aoe: 85, size: 8 }
+        { cd: 1.50, dmg: 30, count: 1, speed: 300, range: 420, aoe: 55, size: 10 },
+        { cd: 1.38, dmg: 43, count: 1, speed: 310, range: 435, aoe: 63, size: 10 },
+        { cd: 1.25, dmg: 56, count: 1, speed: 320, range: 450, aoe: 70, size: 10 },
+        { cd: 1.13, dmg: 69, count: 1, speed: 330, range: 465, aoe: 78, size: 10 },
+        { cd: 1.00, dmg: 82, count: 1, speed: 340, range: 480, aoe: 85, size: 10 }
       ]
     },
 
@@ -344,14 +350,22 @@ const CONTENT = {
 
     arcane_missiles: {
       name: '奥术飞弹', icon: '✨', color: '#b197fc', cls: 'mage',
-      desc: '发射多枚会追踪敌人的奥术飞弹。',
+      desc: '施放后 3 秒内连续放出多轮飞弹；飞弹随机四散射出，然后各自转弯追敌。',
       behavior: 'projectile',
+      // volleys: 一轮几发; count: 每轮几枚; interval: 轮间隔; window: 齐射窗口(秒)
+      // scatter: 出膛时的随机偏角(弧度), homing 会把它们拐回来
       lvl: [
-        { cd: 2.00, dmg: 12, count: 3, speed: 380, range: 420, homing: 5, spread: 0.16, size: 5 },
-        { cd: 1.83, dmg: 17, count: 3, speed: 393, range: 430, homing: 5.5, spread: 0.16, size: 5 },
-        { cd: 1.65, dmg: 21, count: 4, speed: 405, range: 440, homing: 6, spread: 0.14, size: 5 },
-        { cd: 1.48, dmg: 26, count: 4, speed: 418, range: 450, homing: 6.5, spread: 0.14, size: 6 },
-        { cd: 1.30, dmg: 30, count: 5, speed: 430, range: 460, homing: 7, spread: 0.12, size: 6 }
+        { cd: 6.00, dmg: 9, volleys: 4, count: 3, interval: 0.75, window: 3.0, speed: 330, range: 420, homing: 5.5, scatter: 1.15, size: 5 },
+        { cd: 5.70, dmg: 11, volleys: 4, count: 3, interval: 0.62, window: 3.0, speed: 345, range: 430, homing: 6.0, scatter: 1.10, size: 5 },
+        { cd: 5.40, dmg: 13, volleys: 5, count: 4, interval: 0.56, window: 3.0, speed: 360, range: 440, homing: 6.5, scatter: 1.05, size: 5 },
+        { cd: 5.10, dmg: 15, volleys: 5, count: 5, interval: 0.50, window: 3.0, speed: 375, range: 450, homing: 7.0, scatter: 1.00, size: 6 },
+        { cd: 4.80, dmg: 17, volleys: 6, count: 6, interval: 0.45, window: 3.0, speed: 390, range: 460, homing: 7.5, scatter: 0.95, size: 6 }
+      ],
+      up: [
+        '飞弹伤害 9 → 11，单轮间隔 0.75s → 0.62s',
+        '齐射轮次 4 → 5，每轮 3 → 4 枚，伤害 11 → 13',
+        '每轮 4 → 5 枚，伤害 13 → 15，弹速 360 → 375',
+        '齐射 6 轮 × 6 枚，伤害 15 → 17，追踪更灵敏'
       ]
     },
 
@@ -412,14 +426,14 @@ const CONTENT = {
 
     pyroblast: {
       name: '炎爆术', icon: '☄', color: '#ff9f43', cls: 'mage',
-      desc: '缓慢的大火球，命中后造成大范围爆炸。',
+      desc: '缓慢的巨大熔岩火球，命中爆炸并使敌人持续灼烧。',
       behavior: 'projectile',
       lvl: [
-        { cd: 7.0, dmg: 90, count: 1, speed: 260, range: 460, aoe: 80, size: 10 },
-        { cd: 6.38, dmg: 133, count: 1, speed: 270, range: 475, aoe: 90, size: 10 },
-        { cd: 5.75, dmg: 175, count: 1, speed: 280, range: 490, aoe: 100, size: 11 },
-        { cd: 5.13, dmg: 218, count: 1, speed: 290, range: 505, aoe: 110, size: 11 },
-        { cd: 4.50, dmg: 260, count: 1, speed: 300, range: 520, aoe: 120, size: 12 }
+        { cd: 7.0, dmg: 90, count: 1, speed: 260, range: 460, aoe: 80, size: 10, dot: { dps: 14, t: 3 } },
+        { cd: 6.38, dmg: 133, count: 1, speed: 270, range: 475, aoe: 90, size: 10, dot: { dps: 19, t: 3.5 } },
+        { cd: 5.75, dmg: 175, count: 1, speed: 280, range: 490, aoe: 100, size: 11, dot: { dps: 24, t: 4 } },
+        { cd: 5.13, dmg: 218, count: 1, speed: 290, range: 505, aoe: 110, size: 11, dot: { dps: 30, t: 4.5 } },
+        { cd: 4.50, dmg: 260, count: 1, speed: 300, range: 520, aoe: 120, size: 12, dot: { dps: 36, t: 5 } }
       ]
     },
 
@@ -462,16 +476,22 @@ const CONTENT = {
       ]
     },
 
-    ice_block: {
-      name: '寒冰屏障', icon: '🧊', color: '#74c0fc', cls: 'mage',
-      desc: '生命垂危时冻结自身，短暂无敌。',
-      behavior: 'buff',
+    shockwave: {
+      name: '冲击波', icon: '💥', color: '#ff8c42', cls: 'mage',
+      desc: '以自身为中心炸开火焰，击退范围内所有敌人，并留下短暂灼烧。',
+      behavior: 'pbaoe',
       lvl: [
-        { cd: 30.0, duration: 2.0, invuln: 2.0, triggerHp: 0.35 },
-        { cd: 27.5, duration: 2.38, invuln: 2.38, triggerHp: 0.35 },
-        { cd: 25.0, duration: 2.75, invuln: 2.75, triggerHp: 0.35 },
-        { cd: 22.5, duration: 3.13, invuln: 3.13, triggerHp: 0.35 },
-        { cd: 20.0, duration: 3.50, invuln: 3.50, triggerHp: 0.35 }
+        { cd: 4.80, dmg: 30, radius: 115, knock: 120, dot: { dps: 6, t: 1.5 } },
+        { cd: 4.45, dmg: 42, radius: 130, knock: 140, dot: { dps: 8, t: 1.75 } },
+        { cd: 4.10, dmg: 54, radius: 143, knock: 160, dot: { dps: 10, t: 2.0 } },
+        { cd: 3.75, dmg: 66, radius: 157, knock: 180, dot: { dps: 12, t: 2.25 } },
+        { cd: 3.40, dmg: 78, radius: 172, knock: 200, dot: { dps: 14, t: 2.5 } }
+      ],
+      up: [
+        '伤害 30 → 42，半径 115 → 130，击退 +20',
+        '伤害 54，半径 143，灼烧 10/s × 2s',
+        '伤害 66，半径 157，击退 180',
+        '伤害 78，半径 172，冷却 3.4s'
       ]
     },
 
@@ -501,16 +521,43 @@ const CONTENT = {
       ]
     },
 
+    arcane_field: {
+      name: '奥术力场', icon: '❇', color: '#b197fc', cls: 'mage',
+      desc: '在自身周围展开力场并跟随移动，持续伤害并大幅减速其中的敌人。',
+      behavior: 'field',
+      // follow: 力场跟着玩家走; 长持续 / 低 DPS / 强减速, 和暴风雪的远程高 DPS 分工
+      lvl: [
+        { cd: 12.0, radius: 120, duration: 7.0, tick: 0.5, dps: 10, slow: 0.45, slowT: 0.6 },
+        { cd: 11.0, radius: 137, duration: 7.5, tick: 0.5, dps: 13, slow: 0.50, slowT: 0.6 },
+        { cd: 10.0, radius: 153, duration: 8.0, tick: 0.5, dps: 16, slow: 0.55, slowT: 0.65 },
+        { cd: 9.0, radius: 170, duration: 8.5, tick: 0.5, dps: 19, slow: 0.60, slowT: 0.7 },
+        { cd: 8.0, radius: 187, duration: 9.0, tick: 0.5, dps: 22, slow: 0.65, slowT: 0.75 }
+      ],
+      up: [
+        '半径 120 → 137，减速 45% → 50%',
+        '每秒伤害 13 → 16，持续 8s',
+        '半径 170，减速 60%，每秒 19',
+        '半径 187，减速 65%，冷却 8s，持续 9s'
+      ]
+    },
+
     arcane_torrent: {
       name: '奥术洪流', icon: '⚡', color: '#b197fc', cls: 'mage',
-      desc: '奥术能量在敌人之间跳跃，伤害递减。',
-      behavior: 'chain',
+      desc: '锁定方向射出持续的柱状奥术能量波，穿透沿途所有敌人；引导期间自身减速。',
+      behavior: 'beam',
+      // length/width: 柱体尺寸; tick: 每跳间隔; slowSelf: 引导时自身移速惩罚
       lvl: [
-        { cd: 6.0, dmg: 30, chains: 6, range: 340, falloff: 0.07 },
-        { cd: 5.38, dmg: 45, chains: 7, range: 360, falloff: 0.0625 },
-        { cd: 4.75, dmg: 60, chains: 8, range: 380, falloff: 0.055 },
-        { cd: 4.13, dmg: 75, chains: 9, range: 400, falloff: 0.0475 },
-        { cd: 3.50, dmg: 90, chains: 10, range: 420, falloff: 0.04 }
+        { cd: 8.0, duration: 2.0, width: 46, length: 360, tick: 0.20, dmg: 12, slowSelf: 0.30 },
+        { cd: 7.3, duration: 2.3, width: 53, length: 385, tick: 0.20, dmg: 17, slowSelf: 0.27 },
+        { cd: 6.6, duration: 2.6, width: 60, length: 410, tick: 0.19, dmg: 22, slowSelf: 0.24 },
+        { cd: 5.9, duration: 2.9, width: 67, length: 435, tick: 0.18, dmg: 27, slowSelf: 0.20 },
+        { cd: 5.2, duration: 3.2, width: 74, length: 460, tick: 0.17, dmg: 32, slowSelf: 0.16 }
+      ],
+      up: [
+        '持续 2.3s，宽度 46 → 53，伤害 12 → 17',
+        '持续 2.6s，宽度 60，冷却 -0.7s',
+        '持续 2.9s，宽度 67，伤害 27，引导减速减轻',
+        '持续 3.2s，宽度 74，伤害 32，冷却 5.2s'
       ]
     }
   },
@@ -719,9 +766,10 @@ const CONTENT = {
       blizzard: 'skill/blizzard.png',
       flamestrike: 'skill/flamestrike.png',
       arcane_power: 'skill/arcane_power.png',
-      ice_block: 'skill/ice_block.png',
+      shockwave: 'skill/shockwave.png',
       dragon_breath: 'skill/dragon_breath.png',
       cone_of_cold: 'skill/cone_of_cold.png',
+      arcane_field: 'skill/arcane_field.png',
       arcane_torrent: 'skill/arcane_torrent.png'
     },
     talent: {
@@ -755,6 +803,22 @@ const CONTENT = {
       arcane_power: 'talent/arcane_power.png',
       arcane_util: 'talent/arcane_util.png',
       arcane_key: 'talent/arcane_key.png'
+    },
+    fx: {
+      fireball_impact: 'fx/fireball_impact.png',
+      fireball_flight: 'fx/fireball_flight.png',
+      flamestrike_ground: 'fx/flamestrike_ground.png',
+      flamestrike_burst: 'fx/flamestrike_burst.png',
+      pyroblast_flight: 'fx/pyroblast_flight.png',
+      pyroblast_impact: 'fx/pyroblast_impact.png',
+      dragon_breath: 'fx/dragon_breath.png',
+      // v0.9: 冰系 / 奥术系关键形态贴图
+      frostbolt_flight: 'fx/frostbolt_flight.png',
+      frostbolt_impact: 'fx/frostbolt_impact.png',
+      frost_nova: 'fx/frost_nova.png',
+      blizzard_ground: 'fx/blizzard_ground.png',
+      arcane_missiles_flight: 'fx/arcane_missiles_flight.png',
+      arcane_field_ground: 'fx/arcane_field_ground.png'
     }
   }
 };
@@ -797,10 +861,11 @@ CONTENT.skillFx = {
   blizzard: 'ice',
   flamestrike: 'fire',
   arcane_power: 'arcane',
-  ice_block: 'ice',
+  shockwave: 'fire',
   dragon_breath: 'dragon',
   cone_of_cold: 'ice',
-  arcane_torrent: 'thunder'
+  arcane_field: 'arcane',
+  arcane_torrent: 'arcane'
 };
 
 for (const id in CONTENT.skillFx) {
@@ -817,8 +882,7 @@ CONTENT.defensiveSkills = {
   shield_wall: 1,
   victory_rush: 1,
   blink: 1,
-  ice_barrier: 1,
-  ice_block: 1
+  ice_barrier: 1
 };
 
 /* 清群技能: AI 自动选择时保证至少一把, 人类不受影响 */
@@ -837,7 +901,9 @@ CONTENT.aoeSkills = {
   flamestrike: 1,
   dragon_breath: 1,
   cone_of_cold: 1,
-  arcane_torrent: 1
+  arcane_torrent: 1,
+  shockwave: 1,
+  arcane_field: 1
 };
 
 /* 真正能快速清场的技能: 优先于普通新技能 */
@@ -852,7 +918,8 @@ CONTENT.strongAoeSkills = {
   flamestrike: 1,
   dragon_breath: 1,
   cone_of_cold: 1,
-  arcane_torrent: 1
+  arcane_torrent: 1,
+  shockwave: 1
 };
 
 /* 法师在风筝距离也能命中的强 AoE: AI 只把这些当作优先清场 */
@@ -860,7 +927,8 @@ CONTENT.mageStrongAoe = {
   blizzard: 1,
   flamestrike: 1,
   arcane_torrent: 1,
-  pyroblast: 1
+  pyroblast: 1,
+  arcane_field: 1
 };
 
 /* 防御型被动: AI 会优先补 */
@@ -882,7 +950,6 @@ CONTENT.rangedSkills = {
   arcane_torrent: 1,
   arcane_power: 1,
   ice_barrier: 1,
-  ice_block: 1,
   blink: 1
 };
 
@@ -891,6 +958,7 @@ CONTENT.closeRangeSkills = {
   cone_of_cold: 1,
   frost_nova: 1,
   arcane_explosion: 1,
+  shockwave: 1,
   whirlwind: 1,
   cleave: 1,
   thunder_clap: 1,
